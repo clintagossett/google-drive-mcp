@@ -83,6 +83,9 @@ const packageJsonPath = join(__dirname, '..', 'package.json');
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 const VERSION = packageJson.version;
 
+// Server start time for uptime tracking
+const SERVER_START_TIME = Date.now();
+
 // -----------------------------------------------------------------------------
 // LOGGING UTILITY
 // -----------------------------------------------------------------------------
@@ -254,6 +257,12 @@ async function checkFileExists(name: string, parentFolderId: string = 'root'): P
 // -----------------------------------------------------------------------------
 // INPUT VALIDATION SCHEMAS
 // -----------------------------------------------------------------------------
+
+// Server Info Schema
+const ServerGetInfoSchema = z.object({
+  includeUptime: z.boolean().optional().default(false)
+});
+
 const SearchSchema = z.object({
   query: z.string().min(1, "Search query is required")
 });
@@ -2124,9 +2133,24 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   }
 });
 
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
+// -----------------------------------------------------------------------------
+// TOOLS DEFINITION
+// -----------------------------------------------------------------------------
+const TOOLS_LIST = [
+      {
+        name: "server_getInfo",
+        description: "Get server information including name, version, capabilities, and uptime. Returns details about the MCP server, project metadata, supported APIs, and optional uptime statistics.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            includeUptime: {
+              type: "boolean",
+              description: "Include server uptime information (how long server has been running)",
+              optional: true
+            }
+          }
+        }
+      },
       {
         name: "search",
         description: "Search for files in Google Drive",
@@ -4880,7 +4904,14 @@ Google Slides:
           required: ["presentationId"]
         }
       }
-    ]
+];
+
+// -----------------------------------------------------------------------------
+// LIST TOOLS REQUEST HANDLER
+// -----------------------------------------------------------------------------
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return {
+    tools: TOOLS_LIST
   };
 });
 
@@ -4902,6 +4933,64 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (request.params.name) {
+      case "server_getInfo": {
+        const validation = ServerGetInfoSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const { includeUptime } = validation.data;
+
+        // Build server info response
+        const serverInfo: any = {
+          server: {
+            name: packageJson.name,
+            version: VERSION,
+            description: packageJson.description,
+            packageName: packageJson.name
+          },
+          project: {
+            repository: packageJson.repository?.url || packageJson.repository,
+            homepage: packageJson.homepage,
+            license: packageJson.license,
+            author: packageJson.author
+          },
+          capabilities: {
+            apis: ['Drive', 'Docs', 'Sheets', 'Slides'],
+            authentication: 'OAuth2',
+            toolCount: TOOLS_LIST.length
+          }
+        };
+
+        // Add uptime if requested
+        if (includeUptime) {
+          const uptimeMs = Date.now() - SERVER_START_TIME;
+          const uptimeSeconds = Math.floor(uptimeMs / 1000);
+
+          // Format uptime as "Xh Ym Zs"
+          const hours = Math.floor(uptimeSeconds / 3600);
+          const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+          const seconds = uptimeSeconds % 60;
+
+          let formatted = '';
+          if (hours > 0) formatted += `${hours}h `;
+          if (minutes > 0 || hours > 0) formatted += `${minutes}m `;
+          formatted += `${seconds}s`;
+
+          serverInfo.uptime = {
+            seconds: uptimeSeconds,
+            formatted: formatted.trim(),
+            startTime: new Date(SERVER_START_TIME).toISOString()
+          };
+        }
+
+        log('Server info requested', { includeUptime });
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(serverInfo, null, 2) }],
+          isError: false
+        };
+      }
+
       case "search": {
         const validation = SearchSchema.safeParse(request.params.arguments);
         if (!validation.success) {
@@ -11216,10 +11305,10 @@ async function main() {
     case undefined:
       try {
         // Start the MCP server
-        console.error("Starting Google Drive MCP server...");
+        console.error(`Starting Google Drive Collaboration MCP Server v${VERSION}...`);
         const transport = new StdioServerTransport();
         await server.connect(transport);
-        log('Server started successfully');
+        log(`Server v${VERSION} started successfully`);
         
         // Set up graceful shutdown
         process.on("SIGINT", async () => {

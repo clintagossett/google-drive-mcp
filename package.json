@@ -1,6 +1,6 @@
 {
     "name": "@clintagossett/google-drive-collaboration-mcp",
-    "version": "2.0.0",
+    "version": "0.0.1",
     "description": "Google Drive Collaboration MCP Server - Extended Model Context Protocol server with comprehensive Google Workspace API coverage (Docs, Sheets, Slides) and collaboration features",
     "license": "MIT",
     "author": "Clint Gossett <clint@clintagossett.com> (forked from Piotr Agier)",
