@@ -1070,6 +1070,39 @@ const SlidesGetSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required")
 });
 
+// Phase 1 Google Slides API Tools (Issue #7)
+const SlidesCreatePresentationSchema = z.object({
+  title: z.string().optional(),
+  locale: z.string().optional(),
+  pageSize: z.object({
+    width: z.object({
+      magnitude: z.number(),
+      unit: z.enum(['EMU', 'PT'])
+    }),
+    height: z.object({
+      magnitude: z.number(),
+      unit: z.enum(['EMU', 'PT'])
+    })
+  }).optional()
+});
+
+const SlidesCreateSlideSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  insertionIndex: z.number().min(0, "Insertion index must be at least 0").optional(),
+  objectId: z.string().optional(),
+  slideLayoutReference: z.object({
+    predefinedLayout: z.string().optional(),
+    layoutId: z.string().optional()
+  }).optional(),
+  placeholderIdMappings: z.array(z.object({
+    layoutPlaceholder: z.object({
+      type: z.string(),
+      index: z.number().optional()
+    }),
+    objectId: z.string()
+  })).optional()
+});
+
 // Phase 1 Google Docs API Tools
 const DocsDeleteContentRangeSchema = z.object({
   documentId: z.string().min(1, "Document ID is required"),
@@ -3478,6 +3511,80 @@ Google Slides:
             }
           },
           required: ["presentationId", "pageObjectId", "shapeType", "x", "y", "width", "height"]
+        }
+      },
+      {
+        name: "slides_createPresentation",
+        description: "Create a new Google Slides presentation. Maps directly to presentations.create in Google Slides API. Returns newly created Presentation object with ID, title, and initial slide.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Presentation title (optional)" },
+            locale: { type: "string", description: "Locale (e.g., 'en_US') (optional)" },
+            pageSize: {
+              type: "object",
+              description: "Page dimensions (optional)",
+              properties: {
+                width: {
+                  type: "object",
+                  properties: {
+                    magnitude: { type: "number", description: "Width value" },
+                    unit: { type: "string", enum: ["EMU", "PT"], description: "Unit: EMU or PT" }
+                  },
+                  required: ["magnitude", "unit"]
+                },
+                height: {
+                  type: "object",
+                  properties: {
+                    magnitude: { type: "number", description: "Height value" },
+                    unit: { type: "string", enum: ["EMU", "PT"], description: "Unit: EMU or PT" }
+                  },
+                  required: ["magnitude", "unit"]
+                }
+              },
+              required: ["width", "height"]
+            }
+          }
+        }
+      },
+      {
+        name: "slides_createSlide",
+        description: "Create a new slide at specified position. Maps directly to CreateSlideRequest in presentations.batchUpdate. Returns batchUpdate response with new slide objectId.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            insertionIndex: { type: "number", description: "Position to insert slide (0-based, optional)" },
+            objectId: { type: "string", description: "Optional custom object ID for new slide" },
+            slideLayoutReference: {
+              type: "object",
+              description: "Layout to use (optional)",
+              properties: {
+                predefinedLayout: { type: "string", description: "Predefined layout name (e.g., 'TITLE_AND_BODY')" },
+                layoutId: { type: "string", description: "Custom layout ID" }
+              }
+            },
+            placeholderIdMappings: {
+              type: "array",
+              description: "Placeholder ID mappings (optional)",
+              items: {
+                type: "object",
+                properties: {
+                  layoutPlaceholder: {
+                    type: "object",
+                    properties: {
+                      type: { type: "string", description: "Placeholder type" },
+                      index: { type: "number", description: "Placeholder index (optional)" }
+                    },
+                    required: ["type"]
+                  },
+                  objectId: { type: "string", description: "Object ID for placeholder" }
+                },
+                required: ["layoutPlaceholder", "objectId"]
+              }
+            }
+          },
+          required: ["presentationId"]
         }
       },
       {
@@ -8031,6 +8138,72 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{ type: "text", text: `Created ${args.shapeType} shape with ID: ${elementId}` }],
           isError: false
         };
+      }
+
+      case "slides_createPresentation": {
+        const validation = SlidesCreatePresentationSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+          const presentation = await slidesService.presentations.create({
+            requestBody: {
+              title: args.title,
+              locale: args.locale,
+              pageSize: args.pageSize
+            }
+          });
+
+          // Return raw API response as JSON
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(presentation.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to create presentation');
+        }
+      }
+
+      case "slides_createSlide": {
+        const validation = SlidesCreateSlideSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                createSlide: {
+                  insertionIndex: args.insertionIndex,
+                  objectId: args.objectId,
+                  slideLayoutReference: args.slideLayoutReference,
+                  placeholderIdMappings: args.placeholderIdMappings
+                }
+              }]
+            }
+          });
+
+          // Return raw API response as JSON
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to create slide');
+        }
       }
 
       case "slides_get": {
