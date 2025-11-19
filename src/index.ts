@@ -295,17 +295,6 @@ const MoveItemSchema = z.object({
   destinationFolderId: z.string().optional()
 });
 
-const CreateGoogleDocSchema = z.object({
-  name: z.string().min(1, "Document name is required"),
-  content: z.string(),
-  parentFolderId: z.string().optional()
-});
-
-const UpdateGoogleDocSchema = z.object({
-  documentId: z.string().min(1, "Document ID is required"),
-  content: z.string()
-});
-
 const CreateGoogleSheetSchema = z.object({
   name: z.string().min(1, "Sheet name is required"),
   data: z.array(z.array(z.string())),
@@ -316,11 +305,6 @@ const UpdateGoogleSheetSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
   range: z.string().min(1, "Range is required"),
   data: z.array(z.array(z.string()))
-});
-
-const GetGoogleSheetContentSchema = z.object({
-  spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
-  range: z.string().min(1, "Range is required")
 });
 
 const FormatGoogleSheetCellsSchema = z.object({
@@ -788,23 +772,6 @@ const SheetsDeleteDuplicatesSchema = z.object({
   message: "End row index must be greater than start row index"
 }).refine(data => data.endColumnIndex > data.startColumnIndex, {
   message: "End column index must be greater than start column index"
-});
-
-const CreateGoogleSlidesSchema = z.object({
-  name: z.string().min(1, "Presentation name is required"),
-  slides: z.array(z.object({
-    title: z.string(),
-    content: z.string()
-  })).min(1, "At least one slide is required"),
-  parentFolderId: z.string().optional()
-});
-
-const UpdateGoogleSlidesSchema = z.object({
-  presentationId: z.string().min(1, "Presentation ID is required"),
-  slides: z.array(z.object({
-    title: z.string(),
-    content: z.string()
-  })).min(1, "At least one slide is required")
 });
 
 const FormatGoogleDocTextSchema = z.object({
@@ -1492,31 +1459,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "createGoogleDoc",
-        description: "Create a new Google Doc",
-        inputSchema: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Doc name" },
-            content: { type: "string", description: "Doc content" },
-            parentFolderId: { type: "string", description: "Parent folder ID", optional: true }
-          },
-          required: ["name", "content"]
-        }
-      },
-      {
-        name: "updateGoogleDoc",
-        description: "Update an existing Google Doc",
-        inputSchema: {
-          type: "object",
-          properties: {
-            documentId: { type: "string", description: "Doc ID" },
-            content: { type: "string", description: "New content" }
-          },
-          required: ["documentId", "content"]
-        }
-      },
-      {
         name: "createGoogleSheet",
         description: "Create a new Google Sheet",
         inputSchema: {
@@ -1547,18 +1489,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["spreadsheetId", "range", "data"]
-        }
-      },
-      {
-        name: "getGoogleSheetContent",
-        description: "Get content of a Google Sheet with cell information",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheetId: { type: "string", description: "Spreadsheet ID" },
-            range: { type: "string", description: "Range to get (e.g., 'Sheet1!A1:C10')" }
-          },
-          required: ["spreadsheetId", "range"]
         }
       },
       {
@@ -2273,51 +2203,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["spreadsheetId", "sheetId", "startRowIndex", "endRowIndex", "startColumnIndex", "endColumnIndex", "comparisonColumns"]
-        }
-      },
-      {
-        name: "createGoogleSlides",
-        description: "Create a new Google Slides presentation",
-        inputSchema: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Presentation name" },
-            slides: {
-              type: "array",
-              description: "Array of slide objects",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  content: { type: "string" }
-                }
-              }
-            },
-            parentFolderId: { type: "string", description: "Parent folder ID (defaults to root)", optional: true }
-          },
-          required: ["name", "slides"]
-        }
-      },
-      {
-        name: "updateGoogleSlides",
-        description: "Update an existing Google Slides presentation",
-        inputSchema: {
-          type: "object",
-          properties: {
-            presentationId: { type: "string", description: "Presentation ID" },
-            slides: {
-              type: "array",
-              description: "Array of slide objects to replace existing slides",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  content: { type: "string" }
-                }
-              }
-            }
-          },
-          required: ["presentationId", "slides"]
         }
       },
       {
@@ -3424,155 +3309,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "createGoogleDoc": {
-        const validation = CreateGoogleDocSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const parentFolderId = await resolveFolderId(args.parentFolderId);
-
-        // Check if document already exists
-        const existingFileId = await checkFileExists(args.name, parentFolderId);
-        if (existingFileId) {
-          return errorResponse(
-            `A document named "${args.name}" already exists in this location. ` +
-            `To update it, use updateGoogleDoc with documentId: ${existingFileId}`
-          );
-        }
-
-        log('Creating Google Doc', { 
-          authClientExists: !!authClient, 
-          parentFolderId,
-          authClientType: authClient?.constructor?.name,
-          accessToken: authClient?.credentials?.access_token ? 'present' : 'missing',
-          tokenLength: authClient?.credentials?.access_token?.length
-        });
-
-        // Debug: Try to get current user to verify auth
-        try {
-          const aboutResponse = await drive.about.get({ fields: 'user' });
-          log('Auth verification - current user:', aboutResponse.data.user?.emailAddress);
-        } catch (authError) {
-          log('Auth verification failed:', authError instanceof Error ? authError.message : String(authError));
-        }
-
-        // Create empty doc
-        let docResponse;
-        try {
-          docResponse = await drive.files.create({
-            requestBody: {
-              name: args.name,
-              mimeType: 'application/vnd.google-apps.document',
-              parents: [parentFolderId]
-            },
-            fields: 'id, name, webViewLink'
-          });
-        } catch (createError: any) {
-          log('Drive files.create error details:', {
-            message: createError.message,
-            code: createError.code,
-            errors: createError.errors,
-            status: createError.status
-          });
-          throw createError;
-        }
-        const doc = docResponse.data;
-
-        const docs = google.docs({ version: 'v1', auth: authClient });
-        await docs.documents.batchUpdate({
-          documentId: doc.id!,
-          requestBody: {
-            requests: [
-              {
-                insertText: { location: { index: 1 }, text: args.content }
-              },
-              // Ensure the text is formatted as normal text, not as a header
-              {
-                updateParagraphStyle: {
-                  range: {
-                    startIndex: 1,
-                    endIndex: args.content.length + 1
-                  },
-                  paragraphStyle: {
-                    namedStyleType: 'NORMAL_TEXT'
-                  },
-                  fields: 'namedStyleType'
-                }
-              }
-            ]
-          }
-        });
-
-        return {
-          content: [{ type: "text", text: `Created Google Doc: ${doc.name}\nID: ${doc.id}\nLink: ${doc.webViewLink}` }],
-          isError: false
-        };
-      }
-
-      case "updateGoogleDoc": {
-        const validation = UpdateGoogleDocSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const docs = google.docs({ version: 'v1', auth: authClient });
-        const document = await docs.documents.get({ documentId: args.documentId });
-
-        // Delete all content
-        // End index of last piece of content (body's last element, fallback to 1 if none)
-        const endIndex = document.data.body?.content?.[document.data.body.content.length - 1]?.endIndex || 1;
-        
-        // Google Docs API doesn't allow deleting the final newline character
-        // We need to leave at least one character in the document
-        const deleteEndIndex = Math.max(1, endIndex - 1);
-
-        if (deleteEndIndex > 1) {
-          await docs.documents.batchUpdate({
-            documentId: args.documentId,
-            requestBody: {
-              requests: [{
-                deleteContentRange: {
-                  range: { startIndex: 1, endIndex: deleteEndIndex }
-                }
-              }]
-            }
-          });
-        }
-
-        // Insert new content
-        await docs.documents.batchUpdate({
-          documentId: args.documentId,
-          requestBody: {
-            requests: [
-              {
-                insertText: { location: { index: 1 }, text: args.content }
-              },
-              // Ensure the text is formatted as normal text, not as a header
-              {
-                updateParagraphStyle: {
-                  range: {
-                    startIndex: 1,
-                    endIndex: args.content.length + 1
-                  },
-                  paragraphStyle: {
-                    namedStyleType: 'NORMAL_TEXT'
-                  },
-                  fields: 'namedStyleType'
-                }
-              }
-            ]
-          }
-        });
-
-        return {
-          content: [{ type: "text", text: `Updated Google Doc: ${document.data.title}` }],
-          isError: false
-        };
-      }
-
       case "createGoogleSheet": {
         const validation = CreateGoogleSheetSchema.safeParse(request.params.arguments);
         if (!validation.success) {
@@ -3646,36 +3382,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         return {
           content: [{ type: "text", text: `Updated Google Sheet range: ${args.range}` }],
-          isError: false
-        };
-      }
-
-      case "getGoogleSheetContent": {
-        const validation = GetGoogleSheetContentSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const sheets = google.sheets({ version: 'v4', auth: authClient });
-        const response = await sheets.spreadsheets.values.get({
-          spreadsheetId: args.spreadsheetId,
-          range: args.range
-        });
-
-        const values = response.data.values || [];
-        let content = `Content for range ${args.range}:\n\n`;
-        
-        if (values.length === 0) {
-          content += "(empty range)";
-        } else {
-          values.forEach((row, rowIndex) => {
-            content += `Row ${rowIndex + 1}: ${row.join(', ')}\n`;
-          });
-        }
-
-        return {
-          content: [{ type: "text", text: content }],
           isError: false
         };
       }
@@ -5323,257 +5029,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } catch (error: any) {
           return errorResponse(error.message || 'Failed to delete duplicates');
         }
-      }
-
-      case "createGoogleSlides": {
-        const validation = CreateGoogleSlidesSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const parentFolderId = await resolveFolderId(args.parentFolderId);
-
-        // Check if presentation already exists
-        const existingFileId = await checkFileExists(args.name, parentFolderId);
-        if (existingFileId) {
-          return errorResponse(
-            `A presentation named "${args.name}" already exists in this location. ` +
-            `File ID: ${existingFileId}. To modify it, you can use Google Slides directly.`
-          );
-        }
-
-        const slidesService = google.slides({ version: 'v1', auth: authClient });
-        const presentation = await slidesService.presentations.create({
-          requestBody: { title: args.name },
-        });
-
-        await drive.files.update({
-          fileId: presentation.data.presentationId!,
-          addParents: parentFolderId,
-          removeParents: 'root',
-        });
-
-        for (const slide of args.slides) {
-          const slideObjectId = `slide_${uuidv4().substring(0, 8)}`;
-          await slidesService.presentations.batchUpdate({
-            presentationId: presentation.data.presentationId!,
-            requestBody: {
-              requests: [{
-                createSlide: {
-                  objectId: slideObjectId,
-                  slideLayoutReference: { predefinedLayout: 'TITLE_AND_BODY' },
-                }
-              }]
-            },
-          });
-
-          const slidePage = await slidesService.presentations.pages.get({
-            presentationId: presentation.data.presentationId!,
-            pageObjectId: slideObjectId,
-          });
-
-          let titlePlaceholderId = '';
-          let bodyPlaceholderId = '';
-          slidePage.data.pageElements?.forEach((el) => {
-            if (el.shape?.placeholder?.type === 'TITLE') {
-              titlePlaceholderId = el.objectId!;
-            } else if (el.shape?.placeholder?.type === 'BODY') {
-              bodyPlaceholderId = el.objectId!;
-            }
-          });
-
-          await slidesService.presentations.batchUpdate({
-            presentationId: presentation.data.presentationId!,
-            requestBody: {
-              requests: [
-                { insertText: { objectId: titlePlaceholderId, text: slide.title, insertionIndex: 0 } },
-                { insertText: { objectId: bodyPlaceholderId, text: slide.content, insertionIndex: 0 } }
-              ]
-            },
-          });
-        }
-
-        return {
-          content: [{
-            type: 'text',
-            text: `Created Google Slides presentation: ${args.name}\nID: ${presentation.data.presentationId}\nLink: https://docs.google.com/presentation/d/${presentation.data.presentationId}`,
-          }],
-          isError: false,
-        };
-      }
-
-      case "updateGoogleSlides": {
-        const validation = UpdateGoogleSlidesSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const slidesService = google.slides({ version: 'v1', auth: authClient });
-        
-        // Get current presentation details
-        const currentPresentation = await slidesService.presentations.get({
-          presentationId: args.presentationId
-        });
-        
-        if (!currentPresentation.data.slides) {
-          return errorResponse("No slides found in presentation");
-        }
-
-        // Collect all slide IDs except the first one (we'll keep it for now)
-        const slideIdsToDelete = currentPresentation.data.slides
-          .slice(1)
-          .map(slide => slide.objectId)
-          .filter((id): id is string => id !== undefined);
-
-        // Prepare requests to update presentation
-        const requests: any[] = [];
-
-        // Delete all slides except the first one
-        if (slideIdsToDelete.length > 0) {
-          slideIdsToDelete.forEach(slideId => {
-            requests.push({
-              deleteObject: { objectId: slideId }
-            });
-          });
-        }
-
-        // Now we need to update the first slide or create new slides
-        if (args.slides.length === 0) {
-          return errorResponse("At least one slide must be provided");
-        }
-
-        // Clear content of the first slide
-        const firstSlide = currentPresentation.data.slides[0];
-        if (firstSlide && firstSlide.pageElements) {
-          // Find text elements to clear
-          firstSlide.pageElements.forEach(element => {
-            if (element.objectId && element.shape?.text) {
-              requests.push({
-                deleteText: {
-                  objectId: element.objectId,
-                  textRange: { type: 'ALL' }
-                }
-              });
-            }
-          });
-        }
-
-        // Update the first slide with new content
-        const firstSlideContent = args.slides[0];
-        if (firstSlide && firstSlide.pageElements) {
-          // Find title and body placeholders
-          let titlePlaceholderId: string | undefined;
-          let bodyPlaceholderId: string | undefined;
-
-          firstSlide.pageElements.forEach(element => {
-            if (element.shape?.placeholder?.type === 'TITLE' || element.shape?.placeholder?.type === 'CENTERED_TITLE') {
-              titlePlaceholderId = element.objectId || undefined;
-            } else if (element.shape?.placeholder?.type === 'BODY' || element.shape?.placeholder?.type === 'SUBTITLE') {
-              bodyPlaceholderId = element.objectId || undefined;
-            }
-          });
-
-          if (titlePlaceholderId) {
-            requests.push({
-              insertText: {
-                objectId: titlePlaceholderId,
-                text: firstSlideContent.title,
-                insertionIndex: 0
-              }
-            });
-          }
-
-          if (bodyPlaceholderId) {
-            requests.push({
-              insertText: {
-                objectId: bodyPlaceholderId,
-                text: firstSlideContent.content,
-                insertionIndex: 0
-              }
-            });
-          }
-        }
-
-        // Add any additional slides from the request
-        for (let i = 1; i < args.slides.length; i++) {
-          const slide = args.slides[i];
-          const slideId = `slide_${Date.now()}_${i}`;
-          
-          requests.push({
-            createSlide: {
-              objectId: slideId,
-              slideLayoutReference: {
-                predefinedLayout: 'TITLE_AND_BODY'
-              }
-            }
-          });
-
-          // We'll need to add content to these slides in a separate batch update
-          // because we need to wait for the slides to be created first
-        }
-
-        // Execute the batch update
-        await slidesService.presentations.batchUpdate({
-          presentationId: args.presentationId,
-          requestBody: { requests }
-        });
-
-        // If we have additional slides, add their content
-        if (args.slides.length > 1) {
-          const contentRequests: any[] = [];
-          
-          // Get updated presentation to find the new slide IDs
-          const updatedPresentation = await slidesService.presentations.get({
-            presentationId: args.presentationId
-          });
-
-          // Add content to the new slides (starting from the second slide in our args)
-          for (let i = 1; i < args.slides.length && updatedPresentation.data.slides; i++) {
-            const slide = args.slides[i];
-            const presentationSlide = updatedPresentation.data.slides[i];
-            
-            if (presentationSlide && presentationSlide.pageElements) {
-              presentationSlide.pageElements.forEach(element => {
-                if (element.objectId) {
-                  if (element.shape?.placeholder?.type === 'TITLE' || element.shape?.placeholder?.type === 'CENTERED_TITLE') {
-                    contentRequests.push({
-                      insertText: {
-                        objectId: element.objectId,
-                        text: slide.title,
-                        insertionIndex: 0
-                      }
-                    });
-                  } else if (element.shape?.placeholder?.type === 'BODY' || element.shape?.placeholder?.type === 'SUBTITLE') {
-                    contentRequests.push({
-                      insertText: {
-                        objectId: element.objectId,
-                        text: slide.content,
-                        insertionIndex: 0
-                      }
-                    });
-                  }
-                }
-              });
-            }
-          }
-
-          if (contentRequests.length > 0) {
-            await slidesService.presentations.batchUpdate({
-              presentationId: args.presentationId,
-              requestBody: { requests: contentRequests }
-            });
-          }
-        }
-
-        return {
-          content: [{
-            type: 'text',
-            text: `Updated Google Slides presentation with ${args.slides.length} slide(s)\nLink: https://docs.google.com/presentation/d/${args.presentationId}`,
-          }],
-          isError: false,
-        };
       }
 
       case "formatGoogleDocText": {
