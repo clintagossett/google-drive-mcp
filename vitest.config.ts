@@ -21,7 +21,7 @@ export default defineConfig({
       branches: 75,
       statements: 80,
     },
-    testTimeout: 10000, // 10s for unit tests
-    hookTimeout: 10000,
+    testTimeout: 15000, // 15s for unit tests (allows for API calls)
+    hookTimeout: 30000, // 30s for hooks (allows for MCP client creation + auth)
   },
 });
