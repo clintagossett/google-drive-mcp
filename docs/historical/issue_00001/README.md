@@ -27,6 +27,9 @@ This directory contains the complete investigation, analysis, and resolution doc
 ### 5. API Comparison
 - **[DOCS_GET_COMPARISON.md](./DOCS_GET_COMPARISON.md)** - Detailed comparison of old vs new approach
 
+### 6. Codebase Audit
+- **[INDEX_SYSTEM_AUDIT.md](./INDEX_SYSTEM_AUDIT.md)** - Complete audit confirming bug was isolated to single tool
+
 ---
 
 ## Quick Summary

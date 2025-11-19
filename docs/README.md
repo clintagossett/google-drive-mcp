@@ -21,12 +21,20 @@ docs/
 ├── README.md (this file)
 ├── development/
 │   ├── AUTONOMOUS_DEVELOPMENT_WORKFLOW.md
-│   ├── INDEX_SYSTEM_AUDIT.md
 │   └── known_issues.md
 ├── historical/
 │   ├── issue_00001/
+│   │   ├── README.md
+│   │   ├── TOC_BUG_INVESTIGATION.md
+│   │   ├── GETGOOGLEDOCCONTENT_ANALYSIS.md
+│   │   ├── DOCS_GET_COMPARISON.md
+│   │   ├── TOC_BUG_FIX_SUMMARY.md
+│   │   └── INDEX_SYSTEM_AUDIT.md
 │   ├── issue_00002/
+│   │   ├── README.md
+│   │   └── PRE_1TO1_TOOLS_EVALUATION.md
 │   └── issue_00004/
+│       └── README.md
 └── workflows/
     └── google-docs-formatting.md
 ```
