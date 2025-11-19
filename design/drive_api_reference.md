@@ -195,19 +195,49 @@ The Google Drive API v3 provides programmatic access to Google Drive file storag
 - `fileId` (string): The file to export
 - `mimeType` (string): Export format MIME type
 
-**Current MCP Tool**: None ❌
-
-**Proposed Tool**: `drive_exportFile`
+**Current MCP Tool**: ✅ `drive_exportFile` (Phase 2)
 
 **Export Formats**:
-- **Google Docs** → PDF, DOCX, HTML, RTF, TXT, ODT, EPUB
-- **Google Sheets** → PDF, XLSX, CSV, TSV, ODS
-- **Google Slides** → PDF, PPTX, ODP, TXT, JPEG, PNG, SVG
+
+**Google Docs** (8 formats):
+- `application/pdf` - PDF (.pdf)
+- `application/vnd.openxmlformats-officedocument.wordprocessingml.document` - MS Word (.docx)
+- `text/markdown` - **Markdown (.md)** ⬅️ NEW in 2024!
+- `text/plain` - Plain text (.txt)
+- `application/rtf` - Rich text (.rtf)
+- `application/vnd.oasis.opendocument.text` - OpenDocument (.odt)
+- `application/zip` - HTML (zipped)
+- `application/epub+zip` - EPUB (.epub)
+
+**Google Sheets** (6 formats):
+- `application/pdf` - PDF (.pdf)
+- `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` - MS Excel (.xlsx)
+- `text/csv` - CSV (.csv) - first sheet only
+- `text/tab-separated-values` - TSV (.tsv) - first sheet only
+- `application/vnd.oasis.opendocument.spreadsheet` - OpenDocument (.ods)
+- `application/zip` - HTML (zipped)
+
+**Google Slides** (7 formats):
+- `application/pdf` - PDF (.pdf)
+- `application/vnd.openxmlformats-officedocument.presentationml.presentation` - MS PowerPoint (.pptx)
+- `text/plain` - Plain text (.txt)
+- `image/jpeg` - JPEG (.jpg) - first slide only
+- `image/png` - PNG (.png) - first slide only
+- `image/svg+xml` - SVG (.svg) - first slide only
+- `application/vnd.oasis.opendocument.presentation` - OpenDocument (.odp)
+
+**Limitations**:
+- Max export size: 10MB
+- Returns base64-encoded content
+- Image formats (JPEG, PNG, SVG) only export first slide
+- CSV/TSV only export first sheet
 
 **Use Cases**:
-- Download Docs as PDF
-- Export Sheets as Excel
-- Convert Slides to PowerPoint
+- Download Docs as PDF or Markdown
+- Export Sheets as Excel or CSV
+- Convert Slides to PowerPoint or images
+
+**Reference**: https://developers.google.com/drive/api/guides/ref-export-formats
 
 ---
 
@@ -570,53 +600,59 @@ The Google Drive API v3 provides programmatic access to Google Drive file storag
 
 ## Implementation Priority
 
-### Phase 1: Essential File Operations (HIGH)
+### Phase 1: Essential File Operations ✅ COMPLETE
 **Impact**: Replace convenience tools, enable proper Docs/Sheets/Slides workflow
-**Tools to implement (5)**:
-1. `drive_createFile` - Complete file creation (all MIME types)
-2. `drive_getFile` - Get file metadata
-3. `drive_updateFile` - Complete file updates
-4. `drive_deleteFile` - Permanent deletion
-5. `drive_listFiles` - Complete search/list with all query options
+**Tools implemented (5/5)**:
+1. ✅ `drive_createFile` - Complete file creation (all MIME types)
+2. ✅ `drive_getFile` - Get file metadata
+3. ✅ `drive_updateFile` - Complete file updates
+4. ✅ `drive_deleteFile` - Permanent deletion
+5. ✅ `drive_listFiles` - Complete search/list with all query options
 
 **Benefits**:
 - Replaces `createGoogleDoc`, `createGoogleSlides` convenience tools
 - Enables proper 1:1 API workflow
 - Full control over file properties
 
+**Status**: Committed in `7055306` with 38 tests
+
 ---
 
-### Phase 2: File Utilities (MEDIUM)
+### Phase 2: File Utilities ✅ COMPLETE
 **Impact**: Common file operations
-**Tools to implement (2)**:
-6. `drive_copyFile` - Duplicate files
-7. `drive_exportFile` - Export to different formats
+**Tools implemented (2/2)**:
+6. ✅ `drive_copyFile` - Duplicate files
+7. ✅ `drive_exportFile` - Export to different formats (21 total formats including Markdown!)
 
 **Benefits**:
 - Template duplication
-- Format conversion (Docs→PDF, Sheets→Excel, etc.)
+- Format conversion (Docs→PDF/Markdown, Sheets→Excel/CSV, Slides→PowerPoint/Images)
+
+**Status**: Committed in `7055306` with 15 tests
 
 ---
 
-### Phase 3: Comments & Collaboration (HIGH)
+### Phase 3: Comments & Collaboration ✅ COMPLETE
 **Impact**: Critical for Docs/Sheets/Slides review workflows
-**Tools to implement (10)**:
-8. `drive_createComment` - Add comments
-9. `drive_listComments` - View all comments
-10. `drive_getComment` - Get comment details
-11. `drive_updateComment` - Edit comments
-12. `drive_deleteComment` - Remove comments
-13. `drive_createReply` - Reply to comments
-14. `drive_listReplies` - View reply threads
-15. `drive_getReply` - Get reply details
-16. `drive_updateReply` - Edit replies
-17. `drive_deleteReply` - Remove replies
+**Tools implemented (10/10)**:
+8. ✅ `drive_createComment` - Add comments
+9. ✅ `drive_listComments` - View all comments
+10. ✅ `drive_getComment` - Get comment details
+11. ✅ `drive_updateComment` - Edit comments
+12. ✅ `drive_deleteComment` - Remove comments
+13. ✅ `drive_createReply` - Reply to comments
+14. ✅ `drive_listReplies` - View reply threads
+15. ✅ `drive_getReply` - Get reply details
+16. ✅ `drive_updateReply` - Edit replies
+17. ✅ `drive_deleteReply` - Remove replies
 
 **Benefits**:
 - Automated review workflows
 - Comment management
 - Feedback tracking
 - Essential for document collaboration
+
+**Status**: Committed in `7055306` with 64 tests
 
 ---
 
@@ -654,14 +690,21 @@ The Google Drive API v3 provides programmatic access to Google Drive file storag
 **In Scope**: 23 methods (82%)
 **Out of Scope**: 5 methods (18%) - webhooks, labels, ID generation
 
-**Current Coverage**: 8 tools (35% of in-scope)
-**To Implement**: 15 tools (65% of in-scope)
+**Current Coverage**: 17 tools (74% of in-scope) ✅
+**To Implement**: 6 tools (26% of in-scope)
 
 **Breakdown by Resource**:
-- **Files**: 5/9 in-scope methods implemented (56%)
+- **Files**: 7/9 in-scope methods implemented (78%) ✅ Phase 1 & 2 complete
 - **Permissions**: 0/5 methods implemented (0%)
-- **Comments**: 0/5 methods implemented (0%)
-- **Replies**: 0/5 methods implemented (0%)
+- **Comments**: 5/5 methods implemented (100%) ✅ Phase 3 complete
+- **Replies**: 5/5 methods implemented (100%) ✅ Phase 3 complete
+
+**Implementation Status**:
+- ✅ **Phase 1 COMPLETE** (5 tools) - Essential File Operations
+- ✅ **Phase 2 COMPLETE** (2 tools) - File Utilities
+- ✅ **Phase 3 COMPLETE** (10 tools) - Comments & Collaboration
+- ⏭️ **Phase 4 PENDING** (5 tools) - Sharing & Permissions
+- ⏭️ **Phase 5 PENDING** (1 tool) - Advanced Operations
 
 ---
 
