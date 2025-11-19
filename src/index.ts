@@ -1103,6 +1103,23 @@ const SlidesCreateSlideSchema = z.object({
   })).optional()
 });
 
+const SlidesDeleteObjectSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Object ID is required")
+});
+
+const SlidesUpdateSlidesPositionSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  slideObjectIds: z.array(z.string().min(1)).min(1, "At least one slide ID is required"),
+  insertionIndex: z.number().min(0, "Insertion index must be at least 0")
+});
+
+const SlidesDuplicateObjectSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Object ID is required"),
+  objectIds: z.record(z.string()).optional()
+});
+
 // Phase 1 Google Docs API Tools
 const DocsDeleteContentRangeSchema = z.object({
   documentId: z.string().min(1, "Document ID is required"),
@@ -3585,6 +3602,44 @@ Google Slides:
             }
           },
           required: ["presentationId"]
+        }
+      },
+      {
+        name: "slides_deleteObject",
+        description: "Delete a slide or page element. Maps directly to DeleteObjectRequest in presentations.batchUpdate. Returns batchUpdate response.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "ID of slide or element to delete" }
+          },
+          required: ["presentationId", "objectId"]
+        }
+      },
+      {
+        name: "slides_updateSlidesPosition",
+        description: "Reorder slides in presentation. Maps directly to UpdateSlidesPositionRequest in presentations.batchUpdate. Returns batchUpdate response.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            slideObjectIds: { type: "array", items: { type: "string" }, description: "Slide IDs in desired order" },
+            insertionIndex: { type: "number", description: "Position to move slides to (0-based)" }
+          },
+          required: ["presentationId", "slideObjectIds", "insertionIndex"]
+        }
+      },
+      {
+        name: "slides_duplicateObject",
+        description: "Duplicate a slide or page element. Maps directly to DuplicateObjectRequest in presentations.batchUpdate. Returns batchUpdate response with new object ID.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "ID of slide or element to duplicate" },
+            objectIds: { type: "object", description: "Optional ID mappings for duplicated objects (record of old ID to new ID)" }
+          },
+          required: ["presentationId", "objectId"]
         }
       },
       {
@@ -8203,6 +8258,107 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         } catch (error: any) {
           return errorResponse(error.message || 'Failed to create slide');
+        }
+      }
+
+      case "slides_deleteObject": {
+        const validation = SlidesDeleteObjectSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                deleteObject: {
+                  objectId: args.objectId
+                }
+              }]
+            }
+          });
+
+          // Return raw API response as JSON
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to delete object');
+        }
+      }
+
+      case "slides_updateSlidesPosition": {
+        const validation = SlidesUpdateSlidesPositionSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                updateSlidesPosition: {
+                  slideObjectIds: args.slideObjectIds,
+                  insertionIndex: args.insertionIndex
+                }
+              }]
+            }
+          });
+
+          // Return raw API response as JSON
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to update slides position');
+        }
+      }
+
+      case "slides_duplicateObject": {
+        const validation = SlidesDuplicateObjectSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                duplicateObject: {
+                  objectId: args.objectId,
+                  objectIds: args.objectIds
+                }
+              }]
+            }
+          });
+
+          // Return raw API response as JSON
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to duplicate object');
         }
       }
 
