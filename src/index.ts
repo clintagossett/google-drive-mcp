@@ -307,9 +307,11 @@ const UpdateGoogleSheetSchema = z.object({
   data: z.array(z.array(z.string()))
 });
 
-const FormatGoogleSheetCellsSchema = z.object({
+// Comprehensive RepeatCellRequest schema - replaces formatGoogleSheetCells, formatGoogleSheetText, formatGoogleSheetNumbers
+const SheetsRepeatCellSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
   range: z.string().min(1, "Range is required"),
+  // Cell format fields (backgroundColor, alignment, wrap)
   backgroundColor: z.object({
     red: z.number().min(0).max(1).optional(),
     green: z.number().min(0).max(1).optional(),
@@ -317,12 +319,8 @@ const FormatGoogleSheetCellsSchema = z.object({
   }).optional(),
   horizontalAlignment: z.enum(["LEFT", "CENTER", "RIGHT"]).optional(),
   verticalAlignment: z.enum(["TOP", "MIDDLE", "BOTTOM"]).optional(),
-  wrapStrategy: z.enum(["OVERFLOW_CELL", "CLIP", "WRAP"]).optional()
-});
-
-const FormatGoogleSheetTextSchema = z.object({
-  spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
-  range: z.string().min(1, "Range is required"),
+  wrapStrategy: z.enum(["OVERFLOW_CELL", "CLIP", "WRAP"]).optional(),
+  // Text format fields (bold, italic, font, color)
   bold: z.boolean().optional(),
   italic: z.boolean().optional(),
   strikethrough: z.boolean().optional(),
@@ -333,19 +331,16 @@ const FormatGoogleSheetTextSchema = z.object({
     red: z.number().min(0).max(1).optional(),
     green: z.number().min(0).max(1).optional(),
     blue: z.number().min(0).max(1).optional()
-  }).optional()
+  }).optional(),
+  // Number format fields (pattern, type)
+  numberFormatPattern: z.string().optional(),
+  numberFormatType: z.enum(["NUMBER", "CURRENCY", "PERCENT", "DATE", "TIME", "DATE_TIME", "SCIENTIFIC"]).optional()
 });
 
-const FormatGoogleSheetNumbersSchema = z.object({
+// Maps to UpdateBordersRequest in Google Sheets API
+const SheetsUpdateBordersSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
-  range: z.string().min(1, "Range is required"),
-  pattern: z.string().min(1, "Pattern is required"),
-  type: z.enum(["NUMBER", "CURRENCY", "PERCENT", "DATE", "TIME", "DATE_TIME", "SCIENTIFIC"]).optional()
-});
-
-const SetGoogleSheetBordersSchema = z.object({
-  spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
-  range: z.string().min(1, "Range is required"),
+  range: z.string().min(1, "Range is required (e.g., 'A1:C10')"),
   style: z.enum(["SOLID", "DASHED", "DOTTED", "DOUBLE"]),
   width: z.number().min(1).max(3).optional(),
   color: z.object({
@@ -361,15 +356,17 @@ const SetGoogleSheetBordersSchema = z.object({
   innerVertical: z.boolean().optional()
 });
 
-const MergeGoogleSheetCellsSchema = z.object({
+// Maps to MergeCellsRequest in Google Sheets API
+const SheetsMergeCellsSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
-  range: z.string().min(1, "Range is required"),
+  range: z.string().min(1, "Range is required (e.g., 'A1:C3')"),
   mergeType: z.enum(["MERGE_ALL", "MERGE_COLUMNS", "MERGE_ROWS"])
 });
 
-const AddGoogleSheetConditionalFormatSchema = z.object({
+// Maps to AddConditionalFormatRuleRequest in Google Sheets API
+const SheetsAddConditionalFormatRuleSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
-  range: z.string().min(1, "Range is required"),
+  range: z.string().min(1, "Range is required (e.g., 'A1:C10')"),
   condition: z.object({
     type: z.enum(["NUMBER_GREATER", "NUMBER_LESS", "TEXT_CONTAINS", "TEXT_STARTS_WITH", "TEXT_ENDS_WITH", "CUSTOM_FORMULA"]),
     value: z.string()
@@ -774,7 +771,8 @@ const SheetsDeleteDuplicatesSchema = z.object({
   message: "End column index must be greater than start column index"
 });
 
-const FormatGoogleDocTextSchema = z.object({
+// Maps to UpdateTextStyleRequest in Google Docs API
+const DocsUpdateTextStyleSchema = z.object({
   documentId: z.string().min(1, "Document ID is required"),
   startIndex: z.number().min(1, "Start index must be at least 1"),
   endIndex: z.number().min(1, "End index must be at least 1"),
@@ -790,7 +788,8 @@ const FormatGoogleDocTextSchema = z.object({
   }).optional()
 });
 
-const FormatGoogleDocParagraphSchema = z.object({
+// Maps to UpdateParagraphStyleRequest in Google Docs API
+const DocsUpdateParagraphStyleSchema = z.object({
   documentId: z.string().min(1, "Document ID is required"),
   startIndex: z.number().min(1, "Start index must be at least 1"),
   endIndex: z.number().min(1, "End index must be at least 1"),
@@ -807,7 +806,7 @@ const GetGoogleSlidesContentSchema = z.object({
   slideIndex: z.number().min(0).optional()
 });
 
-const FormatGoogleSlidesTextSchema = z.object({
+const SlidesUpdateTextStyleSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
   objectId: z.string().min(1, "Object ID is required"),
   startIndex: z.number().min(0).optional(),
@@ -825,7 +824,7 @@ const FormatGoogleSlidesTextSchema = z.object({
   }).optional()
 });
 
-const FormatGoogleSlidesParagraphSchema = z.object({
+const SlidesUpdateParagraphStyleSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
   objectId: z.string().min(1, "Object ID is required"),
   alignment: z.enum(['START', 'CENTER', 'END', 'JUSTIFIED']).optional(),
@@ -833,7 +832,7 @@ const FormatGoogleSlidesParagraphSchema = z.object({
   bulletStyle: z.enum(['NONE', 'DISC', 'ARROW', 'SQUARE', 'DIAMOND', 'STAR', 'NUMBERED']).optional()
 });
 
-const StyleGoogleSlidesShapeSchema = z.object({
+const SlidesUpdateShapePropertiesSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
   objectId: z.string().min(1, "Shape object ID is required"),
   backgroundColor: z.object({
@@ -851,7 +850,7 @@ const StyleGoogleSlidesShapeSchema = z.object({
   outlineDashStyle: z.enum(['SOLID', 'DOT', 'DASH', 'DASH_DOT', 'LONG_DASH', 'LONG_DASH_DOT']).optional()
 });
 
-const SetGoogleSlidesBackgroundSchema = z.object({
+const SlidesUpdatePagePropertiesSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
   pageObjectIds: z.array(z.string()).min(1, "At least one page object ID is required"),
   backgroundColor: z.object({
@@ -862,7 +861,7 @@ const SetGoogleSlidesBackgroundSchema = z.object({
   })
 });
 
-const CreateGoogleSlidesTextBoxSchema = z.object({
+const SlidesCreateTextBoxSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
   pageObjectId: z.string().min(1, "Page object ID is required"),
   text: z.string().min(1, "Text content is required"),
@@ -875,7 +874,7 @@ const CreateGoogleSlidesTextBoxSchema = z.object({
   italic: z.boolean().optional()
 });
 
-const CreateGoogleSlidesShapeSchema = z.object({
+const SlidesCreateShapeSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
   pageObjectId: z.string().min(1, "Page object ID is required"),
   shapeType: z.enum(['RECTANGLE', 'ELLIPSE', 'DIAMOND', 'TRIANGLE', 'STAR', 'ROUND_RECTANGLE', 'ARROW']),
@@ -1492,13 +1491,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "formatGoogleSheetCells",
-        description: "Format cells in a Google Sheet (background, borders, alignment)",
+        name: "sheets_repeatCell",
+        description: "Format cells in a Google Sheet. Maps to RepeatCellRequest in Google Sheets API. Supports cell formatting (background, alignment, wrap), text formatting (bold, font, color), and number formatting (pattern, type).",
         inputSchema: {
           type: "object",
           properties: {
             spreadsheetId: { type: "string", description: "Spreadsheet ID" },
             range: { type: "string", description: "Range to format (e.g., 'A1:C10')" },
+            // Cell format
             backgroundColor: {
               type: "object",
               description: "Background color (RGB values 0-1)",
@@ -1526,19 +1526,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "Text wrapping",
               enum: ["OVERFLOW_CELL", "CLIP", "WRAP"],
               optional: true
-            }
-          },
-          required: ["spreadsheetId", "range"]
-        }
-      },
-      {
-        name: "formatGoogleSheetText",
-        description: "Apply text formatting to cells in a Google Sheet",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheetId: { type: "string", description: "Spreadsheet ID" },
-            range: { type: "string", description: "Range to format (e.g., 'A1:C10')" },
+            },
+            // Text format
             bold: { type: "boolean", description: "Make text bold", optional: true },
             italic: { type: "boolean", description: "Make text italic", optional: true },
             strikethrough: { type: "boolean", description: "Strikethrough text", optional: true },
@@ -1554,36 +1543,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 blue: { type: "number", optional: true }
               },
               optional: true
-            }
-          },
-          required: ["spreadsheetId", "range"]
-        }
-      },
-      {
-        name: "formatGoogleSheetNumbers",
-        description: "Apply number formatting to cells in a Google Sheet",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheetId: { type: "string", description: "Spreadsheet ID" },
-            range: { type: "string", description: "Range to format (e.g., 'A1:C10')" },
-            pattern: {
-              type: "string",
-              description: "Number format pattern (e.g., '#,##0.00', 'yyyy-mm-dd', '$#,##0.00', '0.00%')"
             },
-            type: {
+            // Number format
+            numberFormatPattern: { type: "string", description: "Number format pattern (e.g., '#,##0.00', 'yyyy-mm-dd')", optional: true },
+            numberFormatType: {
               type: "string",
               description: "Format type",
               enum: ["NUMBER", "CURRENCY", "PERCENT", "DATE", "TIME", "DATE_TIME", "SCIENTIFIC"],
               optional: true
             }
           },
-          required: ["spreadsheetId", "range", "pattern"]
+          required: ["spreadsheetId", "range"]
         }
       },
       {
-        name: "setGoogleSheetBorders",
-        description: "Set borders for cells in a Google Sheet",
+        name: "sheets_updateBorders",
+        description: "Set borders for cells in a Google Sheet. Maps directly to UpdateBordersRequest in batchUpdate API.",
         inputSchema: {
           type: "object",
           properties: {
@@ -1616,8 +1591,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "mergeGoogleSheetCells",
-        description: "Merge cells in a Google Sheet",
+        name: "sheets_mergeCells",
+        description: "Merge cells in a Google Sheet. Maps directly to MergeCellsRequest in batchUpdate API.",
         inputSchema: {
           type: "object",
           properties: {
@@ -1633,8 +1608,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "addGoogleSheetConditionalFormat",
-        description: "Add conditional formatting to a Google Sheet",
+        name: "sheets_addConditionalFormatRule",
+        description: "Add conditional formatting to a Google Sheet. Maps directly to AddConditionalFormatRuleRequest in batchUpdate API.",
         inputSchema: {
           type: "object",
           properties: {
@@ -2206,8 +2181,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "formatGoogleDocText",
-        description: "Apply text formatting to a range in a Google Doc",
+        name: "docs_updateTextStyle",
+        description: "Apply text formatting to a range in a Google Doc. Maps directly to UpdateTextStyleRequest in batchUpdate API.",
         inputSchema: {
           type: "object",
           properties: {
@@ -2234,8 +2209,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "formatGoogleDocParagraph",
-        description: "Apply paragraph formatting to a range in a Google Doc",
+        name: "docs_updateParagraphStyle",
+        description: "Apply paragraph formatting to a range in a Google Doc. Maps directly to UpdateParagraphStyleRequest in batchUpdate API.",
         inputSchema: {
           type: "object",
           properties: {
@@ -2829,7 +2804,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "formatGoogleSlidesText",
+        name: "slides_updateTextStyle",
         description: "Apply text formatting to elements in Google Slides",
         inputSchema: {
           type: "object",
@@ -2859,7 +2834,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "formatGoogleSlidesParagraph",
+        name: "slides_updateParagraphStyle",
         description: "Apply paragraph formatting to text in Google Slides",
         inputSchema: {
           type: "object",
@@ -2884,7 +2859,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "styleGoogleSlidesShape",
+        name: "slides_updateShapeProperties",
         description: "Style shapes in Google Slides",
         inputSchema: {
           type: "object",
@@ -2924,7 +2899,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "setGoogleSlidesBackground",
+        name: "slides_updatePageProperties",
         description: "Set background color for slides",
         inputSchema: {
           type: "object",
@@ -2950,7 +2925,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "createGoogleSlidesTextBox",
+        name: "slides_createTextBox",
         description: "Create a text box in Google Slides",
         inputSchema: {
           type: "object",
@@ -2970,7 +2945,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
-        name: "createGoogleSlidesShape",
+        name: "slides_createShape",
         description: "Create a shape in Google Slides",
         inputSchema: {
           type: "object",
@@ -3386,86 +3361,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "formatGoogleSheetCells": {
-        const validation = FormatGoogleSheetCellsSchema.safeParse(request.params.arguments);
+      case "sheets_repeatCell": {
+        const validation = SheetsRepeatCellSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
         const args = validation.data;
 
         const sheets = google.sheets({ version: 'v4', auth: authClient });
-        
-        // Parse the range to get sheet ID and grid range
-        const rangeData = await sheets.spreadsheets.get({
-          spreadsheetId: args.spreadsheetId,
-          ranges: [args.range],
-          fields: 'sheets(properties(sheetId,title))'
-        });
 
-        console.error(`[DEBUG] formatGoogleSheetCells - range: ${args.range}`);
-        console.error(`[DEBUG] rangeData.data:`, JSON.stringify(rangeData.data, null, 2));
-        
-        const sheetName = args.range.includes('!') ? args.range.split('!')[0] : 'Sheet1';
-        console.error(`[DEBUG] Calculated sheetName: "${sheetName}"`);
-        
-        const sheet = rangeData.data.sheets?.find(s => s.properties?.title === sheetName);
-        console.error(`[DEBUG] Found sheet:`, sheet ? JSON.stringify(sheet, null, 2) : 'null');
-        
-        if (!sheet || sheet.properties?.sheetId === undefined || sheet.properties?.sheetId === null) {
-          console.error(`[DEBUG] Available sheets:`, rangeData.data.sheets?.map(s => s.properties?.title).join(', '));
-          return errorResponse(`Sheet "${sheetName}" not found`);
-        }
-
-        // Parse A1 notation to grid range
-        const a1Range = args.range.includes('!') ? args.range.split('!')[1] : args.range;
-        const gridRange = convertA1ToGridRange(a1Range, sheet.properties.sheetId!);
-
-        const requests: any[] = [{
-          repeatCell: {
-            range: gridRange,
-            cell: {
-              userEnteredFormat: {
-                ...(args.backgroundColor && {
-                  backgroundColor: {
-                    red: args.backgroundColor.red || 0,
-                    green: args.backgroundColor.green || 0,
-                    blue: args.backgroundColor.blue || 0
-                  }
-                }),
-                ...(args.horizontalAlignment && { horizontalAlignment: args.horizontalAlignment }),
-                ...(args.verticalAlignment && { verticalAlignment: args.verticalAlignment }),
-                ...(args.wrapStrategy && { wrapStrategy: args.wrapStrategy })
-              }
-            },
-            fields: [
-              args.backgroundColor && 'userEnteredFormat.backgroundColor',
-              args.horizontalAlignment && 'userEnteredFormat.horizontalAlignment',
-              args.verticalAlignment && 'userEnteredFormat.verticalAlignment',
-              args.wrapStrategy && 'userEnteredFormat.wrapStrategy'
-            ].filter(Boolean).join(',')
-          }
-        }];
-
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: args.spreadsheetId,
-          requestBody: { requests }
-        });
-
-        return {
-          content: [{ type: "text", text: `Formatted cells in range ${args.range}` }],
-          isError: false
-        };
-      }
-
-      case "formatGoogleSheetText": {
-        const validation = FormatGoogleSheetTextSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const sheets = google.sheets({ version: 'v4', auth: authClient });
-        
         // Get sheet information
         const rangeData = await sheets.spreadsheets.get({
           spreadsheetId: args.spreadsheetId,
@@ -3482,49 +3386,100 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const a1Range = args.range.includes('!') ? args.range.split('!')[1] : args.range;
         const gridRange = convertA1ToGridRange(a1Range, sheet.properties.sheetId!);
 
-        const textFormat: any = {};
+        // Build userEnteredFormat object dynamically
+        const userEnteredFormat: any = {};
         const fields: string[] = [];
 
-        if (args.bold !== undefined) {
-          textFormat.bold = args.bold;
-          fields.push('bold');
-        }
-        if (args.italic !== undefined) {
-          textFormat.italic = args.italic;
-          fields.push('italic');
-        }
-        if (args.strikethrough !== undefined) {
-          textFormat.strikethrough = args.strikethrough;
-          fields.push('strikethrough');
-        }
-        if (args.underline !== undefined) {
-          textFormat.underline = args.underline;
-          fields.push('underline');
-        }
-        if (args.fontSize !== undefined) {
-          textFormat.fontSize = args.fontSize;
-          fields.push('fontSize');
-        }
-        if (args.fontFamily !== undefined) {
-          textFormat.fontFamily = args.fontFamily;
-          fields.push('fontFamily');
-        }
-        if (args.foregroundColor) {
-          textFormat.foregroundColor = {
-            red: args.foregroundColor.red || 0,
-            green: args.foregroundColor.green || 0,
-            blue: args.foregroundColor.blue || 0
+        // Cell format fields
+        if (args.backgroundColor) {
+          userEnteredFormat.backgroundColor = {
+            red: args.backgroundColor.red || 0,
+            green: args.backgroundColor.green || 0,
+            blue: args.backgroundColor.blue || 0
           };
-          fields.push('foregroundColor');
+          fields.push('userEnteredFormat.backgroundColor');
+        }
+        if (args.horizontalAlignment) {
+          userEnteredFormat.horizontalAlignment = args.horizontalAlignment;
+          fields.push('userEnteredFormat.horizontalAlignment');
+        }
+        if (args.verticalAlignment) {
+          userEnteredFormat.verticalAlignment = args.verticalAlignment;
+          fields.push('userEnteredFormat.verticalAlignment');
+        }
+        if (args.wrapStrategy) {
+          userEnteredFormat.wrapStrategy = args.wrapStrategy;
+          fields.push('userEnteredFormat.wrapStrategy');
+        }
+
+        // Text format fields
+        const hasTextFormat = args.bold !== undefined || args.italic !== undefined ||
+                             args.strikethrough !== undefined || args.underline !== undefined ||
+                             args.fontSize !== undefined || args.fontFamily !== undefined ||
+                             args.foregroundColor !== undefined;
+
+        if (hasTextFormat) {
+          const textFormat: any = {};
+          const textFields: string[] = [];
+
+          if (args.bold !== undefined) {
+            textFormat.bold = args.bold;
+            textFields.push('bold');
+          }
+          if (args.italic !== undefined) {
+            textFormat.italic = args.italic;
+            textFields.push('italic');
+          }
+          if (args.strikethrough !== undefined) {
+            textFormat.strikethrough = args.strikethrough;
+            textFields.push('strikethrough');
+          }
+          if (args.underline !== undefined) {
+            textFormat.underline = args.underline;
+            textFields.push('underline');
+          }
+          if (args.fontSize !== undefined) {
+            textFormat.fontSize = args.fontSize;
+            textFields.push('fontSize');
+          }
+          if (args.fontFamily !== undefined) {
+            textFormat.fontFamily = args.fontFamily;
+            textFields.push('fontFamily');
+          }
+          if (args.foregroundColor) {
+            textFormat.foregroundColor = {
+              red: args.foregroundColor.red || 0,
+              green: args.foregroundColor.green || 0,
+              blue: args.foregroundColor.blue || 0
+            };
+            textFields.push('foregroundColor');
+          }
+
+          userEnteredFormat.textFormat = textFormat;
+          fields.push('userEnteredFormat.textFormat(' + textFields.join(',') + ')');
+        }
+
+        // Number format fields
+        if (args.numberFormatPattern) {
+          const numberFormat: any = {
+            pattern: args.numberFormatPattern
+          };
+          if (args.numberFormatType) {
+            numberFormat.type = args.numberFormatType;
+          }
+          userEnteredFormat.numberFormat = numberFormat;
+          fields.push('userEnteredFormat.numberFormat');
+        }
+
+        if (fields.length === 0) {
+          return errorResponse("No formatting options specified");
         }
 
         const requests = [{
           repeatCell: {
             range: gridRange,
-            cell: {
-              userEnteredFormat: { textFormat }
-            },
-            fields: 'userEnteredFormat.textFormat(' + fields.join(',') + ')'
+            cell: { userEnteredFormat },
+            fields: fields.join(',')
           }
         }];
 
@@ -3534,65 +3489,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         });
 
         return {
-          content: [{ type: "text", text: `Applied text formatting to range ${args.range}` }],
+          content: [{ type: "text", text: `Applied formatting to range ${args.range}` }],
           isError: false
         };
       }
 
-      case "formatGoogleSheetNumbers": {
-        const validation = FormatGoogleSheetNumbersSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const sheets = google.sheets({ version: 'v4', auth: authClient });
-        
-        const rangeData = await sheets.spreadsheets.get({
-          spreadsheetId: args.spreadsheetId,
-          ranges: [args.range],
-          fields: 'sheets(properties(sheetId,title))'
-        });
-
-        const sheetName = args.range.includes('!') ? args.range.split('!')[0] : 'Sheet1';
-        const sheet = rangeData.data.sheets?.find(s => s.properties?.title === sheetName);
-        if (!sheet || sheet.properties?.sheetId === undefined || sheet.properties?.sheetId === null) {
-          return errorResponse(`Sheet "${sheetName}" not found`);
-        }
-
-        const a1Range = args.range.includes('!') ? args.range.split('!')[1] : args.range;
-        const gridRange = convertA1ToGridRange(a1Range, sheet.properties.sheetId!);
-
-        const numberFormat: any = {
-          pattern: args.pattern
-        };
-        if (args.type) {
-          numberFormat.type = args.type;
-        }
-
-        const requests = [{
-          repeatCell: {
-            range: gridRange,
-            cell: {
-              userEnteredFormat: { numberFormat }
-            },
-            fields: 'userEnteredFormat.numberFormat'
-          }
-        }];
-
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: args.spreadsheetId,
-          requestBody: { requests }
-        });
-
-        return {
-          content: [{ type: "text", text: `Applied number formatting to range ${args.range}` }],
-          isError: false
-        };
-      }
-
-      case "setGoogleSheetBorders": {
-        const validation = SetGoogleSheetBordersSchema.safeParse(request.params.arguments);
+      case "sheets_updateBorders": {
+        const validation = SheetsUpdateBordersSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -3649,8 +3552,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "mergeGoogleSheetCells": {
-        const validation = MergeGoogleSheetCellsSchema.safeParse(request.params.arguments);
+      case "sheets_mergeCells": {
+        const validation = SheetsMergeCellsSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -3691,8 +3594,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "addGoogleSheetConditionalFormat": {
-        const validation = AddGoogleSheetConditionalFormatSchema.safeParse(request.params.arguments);
+      case "sheets_addConditionalFormatRule": {
+        const validation = SheetsAddConditionalFormatRuleSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -5031,8 +4934,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
-      case "formatGoogleDocText": {
-        const validation = FormatGoogleDocTextSchema.safeParse(request.params.arguments);
+      case "docs_updateTextStyle": {
+        const validation = DocsUpdateTextStyleSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -5111,8 +5014,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "formatGoogleDocParagraph": {
-        const validation = FormatGoogleDocParagraphSchema.safeParse(request.params.arguments);
+      case "docs_updateParagraphStyle": {
+        const validation = DocsUpdateParagraphStyleSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -6639,8 +6542,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "formatGoogleSlidesText": {
-        const validation = FormatGoogleSlidesTextSchema.safeParse(request.params.arguments);
+      case "slides_updateTextStyle": {
+        const validation = SlidesUpdateTextStyleSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -6730,8 +6633,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "formatGoogleSlidesParagraph": {
-        const validation = FormatGoogleSlidesParagraphSchema.safeParse(request.params.arguments);
+      case "slides_updateParagraphStyle": {
+        const validation = SlidesUpdateParagraphStyleSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -6799,8 +6702,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "styleGoogleSlidesShape": {
-        const validation = StyleGoogleSlidesShapeSchema.safeParse(request.params.arguments);
+      case "slides_updateShapeProperties": {
+        const validation = SlidesUpdateShapePropertiesSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -6885,8 +6788,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "setGoogleSlidesBackground": {
-        const validation = SetGoogleSlidesBackgroundSchema.safeParse(request.params.arguments);
+      case "slides_updatePageProperties": {
+        const validation = SlidesUpdatePagePropertiesSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -6925,8 +6828,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "createGoogleSlidesTextBox": {
-        const validation = CreateGoogleSlidesTextBoxSchema.safeParse(request.params.arguments);
+      case "slides_createTextBox": {
+        const validation = SlidesCreateTextBoxSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
@@ -7011,8 +6914,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "createGoogleSlidesShape": {
-        const validation = CreateGoogleSlidesShapeSchema.safeParse(request.params.arguments);
+      case "slides_createShape": {
+        const validation = SlidesCreateShapeSchema.safeParse(request.params.arguments);
         if (!validation.success) {
           return errorResponse(validation.error.errors[0].message);
         }
