@@ -1456,6 +1456,154 @@ const SlidesRerouteLineSchema = z.object({
   objectId: z.string().min(1, "Object ID is required")
 });
 
+// Phase 4 Zod Schemas (Issue #7 - Table Operations)
+const SlidesInsertTableRowsSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  tableObjectId: z.string().min(1, "Table object ID is required"),
+  cellLocation: z.object({
+    rowIndex: z.number().min(0),
+    columnIndex: z.number().min(0)
+  }),
+  insertBelow: z.boolean(),
+  number: z.number().min(1, "Number of rows must be at least 1").optional()
+});
+
+const SlidesInsertTableColumnsSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  tableObjectId: z.string().min(1, "Table object ID is required"),
+  cellLocation: z.object({
+    rowIndex: z.number().min(0),
+    columnIndex: z.number().min(0)
+  }),
+  insertRight: z.boolean(),
+  number: z.number().min(1, "Number of columns must be at least 1").optional()
+});
+
+const SlidesDeleteTableRowSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  tableObjectId: z.string().min(1, "Table object ID is required"),
+  cellLocation: z.object({
+    rowIndex: z.number().min(0),
+    columnIndex: z.number().min(0)
+  })
+});
+
+const SlidesDeleteTableColumnSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  tableObjectId: z.string().min(1, "Table object ID is required"),
+  cellLocation: z.object({
+    rowIndex: z.number().min(0),
+    columnIndex: z.number().min(0)
+  })
+});
+
+const SlidesUpdateTableCellPropertiesSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Table object ID is required"),
+  tableRange: z.object({
+    location: z.object({
+      rowIndex: z.number().min(0),
+      columnIndex: z.number().min(0)
+    }),
+    rowSpan: z.number().min(1).optional(),
+    columnSpan: z.number().min(1).optional()
+  }),
+  tableCellProperties: z.object({
+    tableCellBackgroundFill: z.object({
+      solidFill: z.object({
+        color: z.object({
+          red: z.number().min(0).max(1).optional(),
+          green: z.number().min(0).max(1).optional(),
+          blue: z.number().min(0).max(1).optional()
+        }),
+        alpha: z.number().min(0).max(1).optional()
+      }).optional()
+    }).optional(),
+    contentAlignment: z.enum(['TOP', 'MIDDLE', 'BOTTOM']).optional()
+  }).optional()
+});
+
+const SlidesUpdateTableBorderPropertiesSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Table object ID is required"),
+  tableRange: z.object({
+    location: z.object({
+      rowIndex: z.number().min(0),
+      columnIndex: z.number().min(0)
+    }),
+    rowSpan: z.number().min(1).optional(),
+    columnSpan: z.number().min(1).optional()
+  }),
+  borderPosition: z.enum(['ALL', 'BOTTOM', 'INNER', 'INNER_HORIZONTAL', 'INNER_VERTICAL', 'LEFT', 'OUTER', 'RIGHT', 'TOP']),
+  tableBorderProperties: z.object({
+    tableBorderFill: z.object({
+      solidFill: z.object({
+        color: z.object({
+          red: z.number().min(0).max(1).optional(),
+          green: z.number().min(0).max(1).optional(),
+          blue: z.number().min(0).max(1).optional()
+        }),
+        alpha: z.number().min(0).max(1).optional()
+      }).optional()
+    }).optional(),
+    weight: z.object({
+      magnitude: z.number().min(0),
+      unit: z.enum(['EMU', 'PT'])
+    }).optional(),
+    dashStyle: z.enum(['SOLID', 'DOT', 'DASH', 'DASH_DOT', 'LONG_DASH', 'LONG_DASH_DOT']).optional()
+  }).optional()
+});
+
+const SlidesUpdateTableColumnPropertiesSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Table object ID is required"),
+  columnIndices: z.array(z.number().min(0)).min(1, "At least one column index is required"),
+  tableColumnProperties: z.object({
+    columnWidth: z.object({
+      magnitude: z.number().min(0),
+      unit: z.enum(['EMU', 'PT'])
+    })
+  })
+});
+
+const SlidesUpdateTableRowPropertiesSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Table object ID is required"),
+  rowIndices: z.array(z.number().min(0)).min(1, "At least one row index is required"),
+  tableRowProperties: z.object({
+    minRowHeight: z.object({
+      magnitude: z.number().min(0),
+      unit: z.enum(['EMU', 'PT'])
+    })
+  })
+});
+
+const SlidesMergeTableCellsSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Table object ID is required"),
+  tableRange: z.object({
+    location: z.object({
+      rowIndex: z.number().min(0),
+      columnIndex: z.number().min(0)
+    }),
+    rowSpan: z.number().min(1),
+    columnSpan: z.number().min(1)
+  })
+});
+
+const SlidesUnmergeTableCellsSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required"),
+  objectId: z.string().min(1, "Table object ID is required"),
+  tableRange: z.object({
+    location: z.object({
+      rowIndex: z.number().min(0),
+      columnIndex: z.number().min(0)
+    }),
+    rowSpan: z.number().min(1).optional(),
+    columnSpan: z.number().min(1).optional()
+  })
+});
+
 // Phase 1 Google Docs API Tools
 const DocsDeleteContentRangeSchema = z.object({
   documentId: z.string().min(1, "Document ID is required"),
@@ -4433,6 +4581,145 @@ Google Slides:
             objectId: { type: "string", description: "Line object ID to reroute" }
           },
           required: ["presentationId", "objectId"]
+        }
+      },
+      {
+        name: "slides_insertTableRows",
+        description: "Insert rows into a table. Maps directly to InsertTableRowsRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            tableObjectId: { type: "string", description: "Table object ID" },
+            cellLocation: { type: "object", description: "Reference cell location", required: ["rowIndex", "columnIndex"] },
+            insertBelow: { type: "boolean", description: "Insert below (true) or above (false)" },
+            number: { type: "number", minimum: 1, description: "Number of rows (default: 1)" }
+          },
+          required: ["presentationId", "tableObjectId", "cellLocation", "insertBelow"]
+        }
+      },
+      {
+        name: "slides_insertTableColumns",
+        description: "Insert columns into a table. Maps directly to InsertTableColumnsRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            tableObjectId: { type: "string", description: "Table object ID" },
+            cellLocation: { type: "object", description: "Reference cell location", required: ["rowIndex", "columnIndex"] },
+            insertRight: { type: "boolean", description: "Insert right (true) or left (false)" },
+            number: { type: "number", minimum: 1, description: "Number of columns (default: 1)" }
+          },
+          required: ["presentationId", "tableObjectId", "cellLocation", "insertRight"]
+        }
+      },
+      {
+        name: "slides_deleteTableRow",
+        description: "Delete a table row. Maps directly to DeleteTableRowRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            tableObjectId: { type: "string", description: "Table object ID" },
+            cellLocation: { type: "object", description: "Cell in row to delete", required: ["rowIndex", "columnIndex"] }
+          },
+          required: ["presentationId", "tableObjectId", "cellLocation"]
+        }
+      },
+      {
+        name: "slides_deleteTableColumn",
+        description: "Delete a table column. Maps directly to DeleteTableColumnRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            tableObjectId: { type: "string", description: "Table object ID" },
+            cellLocation: { type: "object", description: "Cell in column to delete", required: ["rowIndex", "columnIndex"] }
+          },
+          required: ["presentationId", "tableObjectId", "cellLocation"]
+        }
+      },
+      {
+        name: "slides_updateTableCellProperties",
+        description: "Update table cell properties (background, alignment). Maps directly to UpdateTableCellPropertiesRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "Table object ID" },
+            tableRange: { type: "object", description: "Cell range to update" },
+            tableCellProperties: { type: "object", description: "Cell properties" }
+          },
+          required: ["presentationId", "objectId", "tableRange"]
+        }
+      },
+      {
+        name: "slides_updateTableBorderProperties",
+        description: "Update table border properties. Maps directly to UpdateTableBorderPropertiesRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "Table object ID" },
+            tableRange: { type: "object", description: "Cell range" },
+            borderPosition: { type: "string", enum: ["ALL", "BOTTOM", "INNER", "INNER_HORIZONTAL", "INNER_VERTICAL", "LEFT", "OUTER", "RIGHT", "TOP"], description: "Border position" },
+            tableBorderProperties: { type: "object", description: "Border properties" }
+          },
+          required: ["presentationId", "objectId", "tableRange", "borderPosition"]
+        }
+      },
+      {
+        name: "slides_updateTableColumnProperties",
+        description: "Update table column properties. Maps directly to UpdateTableColumnPropertiesRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "Table object ID" },
+            columnIndices: { type: "array", items: { type: "number" }, minItems: 1, description: "Column indices" },
+            tableColumnProperties: { type: "object", description: "Column properties (width)" }
+          },
+          required: ["presentationId", "objectId", "columnIndices", "tableColumnProperties"]
+        }
+      },
+      {
+        name: "slides_updateTableRowProperties",
+        description: "Update table row properties. Maps directly to UpdateTableRowPropertiesRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "Table object ID" },
+            rowIndices: { type: "array", items: { type: "number" }, minItems: 1, description: "Row indices" },
+            tableRowProperties: { type: "object", description: "Row properties (height)" }
+          },
+          required: ["presentationId", "objectId", "rowIndices", "tableRowProperties"]
+        }
+      },
+      {
+        name: "slides_mergeTableCells",
+        description: "Merge table cells. Maps directly to MergeTableCellsRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "Table object ID" },
+            tableRange: { type: "object", description: "Range of cells to merge (must form rectangle)" }
+          },
+          required: ["presentationId", "objectId", "tableRange"]
+        }
+      },
+      {
+        name: "slides_unmergeTableCells",
+        description: "Unmerge table cells. Maps directly to UnmergeTableCellsRequest in presentations.batchUpdate.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "Presentation ID" },
+            objectId: { type: "string", description: "Table object ID" },
+            tableRange: { type: "object", description: "Range containing merged cells to unmerge" }
+          },
+          required: ["presentationId", "objectId", "tableRange"]
         }
       },
       {
@@ -9928,6 +10215,379 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         } catch (error: any) {
           return errorResponse(error.message || 'Failed to reroute line');
+        }
+      }
+
+      case "slides_insertTableRows": {
+        const validation = SlidesInsertTableRowsSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const insertTableRowsRequest: any = {
+            tableObjectId: args.tableObjectId,
+            cellLocation: args.cellLocation,
+            insertBelow: args.insertBelow
+          };
+
+          if (args.number) {
+            insertTableRowsRequest.number = args.number;
+          }
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                insertTableRows: insertTableRowsRequest
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to insert table rows');
+        }
+      }
+
+      case "slides_insertTableColumns": {
+        const validation = SlidesInsertTableColumnsSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const insertTableColumnsRequest: any = {
+            tableObjectId: args.tableObjectId,
+            cellLocation: args.cellLocation,
+            insertRight: args.insertRight
+          };
+
+          if (args.number) {
+            insertTableColumnsRequest.number = args.number;
+          }
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                insertTableColumns: insertTableColumnsRequest
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to insert table columns');
+        }
+      }
+
+      case "slides_deleteTableRow": {
+        const validation = SlidesDeleteTableRowSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                deleteTableRow: {
+                  tableObjectId: args.tableObjectId,
+                  cellLocation: args.cellLocation
+                }
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to delete table row');
+        }
+      }
+
+      case "slides_deleteTableColumn": {
+        const validation = SlidesDeleteTableColumnSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                deleteTableColumn: {
+                  tableObjectId: args.tableObjectId,
+                  cellLocation: args.cellLocation
+                }
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to delete table column');
+        }
+      }
+
+      case "slides_updateTableCellProperties": {
+        const validation = SlidesUpdateTableCellPropertiesSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const updateTableCellPropertiesRequest: any = {
+            objectId: args.objectId,
+            tableRange: args.tableRange
+          };
+
+          if (args.tableCellProperties) {
+            updateTableCellPropertiesRequest.tableCellProperties = args.tableCellProperties;
+            updateTableCellPropertiesRequest.fields = Object.keys(args.tableCellProperties).map(k => `tableCellProperties.${k}`).join(',');
+          }
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                updateTableCellProperties: updateTableCellPropertiesRequest
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to update table cell properties');
+        }
+      }
+
+      case "slides_updateTableBorderProperties": {
+        const validation = SlidesUpdateTableBorderPropertiesSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const updateTableBorderPropertiesRequest: any = {
+            objectId: args.objectId,
+            tableRange: args.tableRange,
+            borderPosition: args.borderPosition
+          };
+
+          if (args.tableBorderProperties) {
+            updateTableBorderPropertiesRequest.tableBorderProperties = args.tableBorderProperties;
+            updateTableBorderPropertiesRequest.fields = Object.keys(args.tableBorderProperties).map(k => `tableBorderProperties.${k}`).join(',');
+          }
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                updateTableBorderProperties: updateTableBorderPropertiesRequest
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to update table border properties');
+        }
+      }
+
+      case "slides_updateTableColumnProperties": {
+        const validation = SlidesUpdateTableColumnPropertiesSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                updateTableColumnProperties: {
+                  objectId: args.objectId,
+                  columnIndices: args.columnIndices,
+                  tableColumnProperties: args.tableColumnProperties,
+                  fields: 'columnWidth'
+                }
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to update table column properties');
+        }
+      }
+
+      case "slides_updateTableRowProperties": {
+        const validation = SlidesUpdateTableRowPropertiesSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                updateTableRowProperties: {
+                  objectId: args.objectId,
+                  rowIndices: args.rowIndices,
+                  tableRowProperties: args.tableRowProperties,
+                  fields: 'minRowHeight'
+                }
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to update table row properties');
+        }
+      }
+
+      case "slides_mergeTableCells": {
+        const validation = SlidesMergeTableCellsSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                mergeTableCells: {
+                  objectId: args.objectId,
+                  tableRange: args.tableRange
+                }
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to merge table cells');
+        }
+      }
+
+      case "slides_unmergeTableCells": {
+        const validation = SlidesUnmergeTableCellsSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+
+          const response = await slidesService.presentations.batchUpdate({
+            presentationId: args.presentationId,
+            requestBody: {
+              requests: [{
+                unmergeTableCells: {
+                  objectId: args.objectId,
+                  tableRange: args.tableRange
+                }
+              }]
+            }
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(response.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to unmerge table cells');
         }
       }
 
