@@ -2,7 +2,13 @@
 
 This directory contains documentation for using the Google Drive MCP server effectively.
 
-## Workflows
+## For Developers
+
+Development guides and workflows for contributing to this project:
+
+- [**Autonomous Development Workflow**](./development/AUTONOMOUS_DEVELOPMENT_WORKFLOW.md) - Complete workflow for taking GitHub issues from creation to closure autonomously, following established patterns
+
+## For Users
 
 Best practices and step-by-step guides for common tasks:
 
@@ -13,6 +19,14 @@ Best practices and step-by-step guides for common tasks:
 ```
 docs/
 ├── README.md (this file)
+├── development/
+│   ├── AUTONOMOUS_DEVELOPMENT_WORKFLOW.md
+│   ├── INDEX_SYSTEM_AUDIT.md
+│   └── known_issues.md
+├── historical/
+│   ├── issue_00001/
+│   ├── issue_00002/
+│   └── issue_00004/
 └── workflows/
     └── google-docs-formatting.md
 ```
