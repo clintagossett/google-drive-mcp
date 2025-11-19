@@ -101,6 +101,17 @@ and Budget Spreadsheet template.
 
 ## Google Cloud Setup
 
+> **⚠️ IMPORTANT: Bring Your Own OAuth Credentials**
+>
+> This MCP server does **NOT** provide shared OAuth credentials. Each user must create their own Google Cloud Project and OAuth credentials. This approach ensures:
+> - ✅ You control your own API quotas and rate limits
+> - ✅ No central OAuth app verification required
+> - ✅ Your data stays between you and Google (no third-party access)
+> - ✅ You can customize scopes and permissions for your use case
+> - ✅ No dependency on a central authentication service
+>
+> **Setup time**: ~10 minutes | **Cost**: Free (Google Cloud free tier)
+
 ### 1. Create a Google Cloud Project
 - Go to the [Google Cloud Console](https://console.cloud.google.com)
 - Click "Select a project" > "New Project"
@@ -832,6 +843,55 @@ These are standard system environment variables that the application reads but y
 |----------|-------------|
 | `GOOGLE_TOKEN_PATH` | Legacy token path - use `GOOGLE_DRIVE_MCP_TOKEN_PATH` instead |
 | `GOOGLE_CLIENT_SECRET_PATH` | Legacy credentials path - use `GOOGLE_DRIVE_OAUTH_CREDENTIALS` instead |
+
+## FAQ
+
+### Why do I need to create my own Google Cloud Project?
+
+This MCP server uses a **"Bring Your Own OAuth"** model where each user creates their own Google Cloud Project and OAuth credentials. This is the recommended approach for OAuth applications because:
+
+1. **No App Verification Required**: The maintainers don't need to go through Google's OAuth app verification process
+2. **Independent Rate Limits**: Each user gets their own API quota (12,000 Drive requests/min, 300 Docs/Sheets/Slides requests/min)
+3. **Privacy & Security**: Your OAuth tokens are between you and Google only - no third-party has access
+4. **Flexibility**: You can customize scopes and permissions for your specific use case
+5. **No Central Dependency**: The server doesn't depend on a central OAuth app that could be disabled or rate-limited
+
+### Is this common for OAuth apps?
+
+Yes! Many developer tools and CLI applications use this model, including:
+- Google Cloud SDK (`gcloud`)
+- Terraform (when using Google Cloud)
+- Various MCP servers and developer tools
+
+The alternative (providing shared credentials) would require:
+- OAuth app verification ($15,000-50,000+ and months of review)
+- Shared rate limits across all users
+- Security risks of distributing OAuth credentials
+- Ongoing maintenance and monitoring
+
+### Do I need to publish my OAuth app?
+
+**No!** You can keep your app in "Testing" status for personal use. Just add yourself as a test user in the OAuth consent screen.
+
+**Note**: Apps in "Testing" status have refresh tokens that expire after 7 days (Google's policy). You'll need to re-authenticate weekly, or you can publish your app to "Production" (no verification needed for personal use).
+
+### Can I share my OAuth credentials with my team?
+
+**Not recommended**. OAuth credentials are tied to a Google Cloud Project, and sharing them means:
+- Shared API quota across all users
+- Security risk if credentials are leaked
+- Harder to revoke access for individual users
+
+Instead, each team member should create their own Google Cloud Project. If you need centralized management, consider using Google Workspace and creating an internal OAuth app.
+
+### What about costs?
+
+**Free!** Google Cloud offers generous free quotas for these APIs:
+- Google Drive API: 1 billion requests per day (free)
+- Google Docs/Sheets/Slides: 60,000 requests per day per user (free)
+- OAuth 2.0: No charge
+
+You only pay if you exceed these limits, which is extremely rare for personal use.
 
 ## License
 
