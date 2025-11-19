@@ -40,6 +40,9 @@ Thumbs.db
 coverage/
 .nyc_output/
 
+# Integration test configuration - NEVER commit these
+tests/integration/test-config.json
+
 # Temporary files
 *.tmp
 *.temp

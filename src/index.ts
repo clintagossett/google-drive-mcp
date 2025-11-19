@@ -302,7 +302,8 @@ const DriveCreateFileSchema = z.object({
   mimeType: z.string().min(1, "MIME type is required"),
   parents: z.array(z.string()).optional(),
   description: z.string().optional(),
-  properties: z.record(z.string()).optional()
+  properties: z.record(z.string()).optional(),
+  supportsAllDrives: z.boolean().optional()
 });
 
 // Maps to files.get in Google Drive API v3
@@ -320,7 +321,8 @@ const DriveUpdateFileSchema = z.object({
   parents: z.array(z.string()).optional(),
   trashed: z.boolean().optional(),
   description: z.string().optional(),
-  properties: z.record(z.string()).optional()
+  properties: z.record(z.string()).optional(),
+  supportsAllDrives: z.boolean().optional()
 });
 
 // Maps to files.delete in Google Drive API v3
@@ -337,7 +339,9 @@ const DriveListFilesSchema = z.object({
   orderBy: z.string().optional(),
   fields: z.string().optional(),
   spaces: z.string().optional(),
-  corpora: z.string().optional()
+  corpora: z.string().optional(),
+  includeItemsFromAllDrives: z.boolean().optional(),
+  supportsAllDrives: z.boolean().optional()
 });
 
 // Phase 2: File Utilities - 1:1 Mappings
@@ -354,7 +358,8 @@ const DriveCopyFileSchema = z.object({
 // Maps to files.export in Google Drive API v3
 const DriveExportFileSchema = z.object({
   fileId: z.string().min(1, "File ID is required"),
-  mimeType: z.string().min(1, "Export MIME type is required")
+  mimeType: z.string().min(1, "Export MIME type is required"),
+  supportsAllDrives: z.boolean().optional()
 });
 
 // Phase 3: Comments & Collaboration - 1:1 Mappings
@@ -2229,7 +2234,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             mimeType: { type: "string", description: "MIME type (e.g., 'application/vnd.google-apps.document', 'application/vnd.google-apps.folder')" },
             parents: { type: "array", items: { type: "string" }, description: "Parent folder IDs", optional: true },
             description: { type: "string", description: "File description", optional: true },
-            properties: { type: "object", description: "Custom key-value properties", optional: true }
+            properties: { type: "object", description: "Custom key-value properties", optional: true },
+            supportsAllDrives: { type: "boolean", description: "Whether to support shared drives", optional: true }
           },
           required: ["name", "mimeType"]
         }
@@ -2259,7 +2265,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             parents: { type: "array", items: { type: "string" }, description: "New parent folder IDs", optional: true },
             trashed: { type: "boolean", description: "Move to/from trash", optional: true },
             description: { type: "string", description: "New description", optional: true },
-            properties: { type: "object", description: "Update custom properties", optional: true }
+            properties: { type: "object", description: "Update custom properties", optional: true },
+            supportsAllDrives: { type: "boolean", description: "Whether to support shared drives", optional: true }
           },
           required: ["fileId"]
         }
@@ -2288,7 +2295,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             orderBy: { type: "string", description: "Sort order (e.g., 'modifiedTime desc')", optional: true },
             fields: { type: "string", description: "Fields to include", optional: true },
             spaces: { type: "string", description: "Spaces to search (drive, appDataFolder, photos)", optional: true },
-            corpora: { type: "string", description: "Bodies to search (user, domain, drive, allDrives)", optional: true }
+            corpora: { type: "string", description: "Bodies to search (user, domain, drive, allDrives)", optional: true },
+            includeItemsFromAllDrives: { type: "boolean", description: "Include items from all drives (required when using corpora=allDrives)", optional: true },
+            supportsAllDrives: { type: "boolean", description: "Whether to support shared drives", optional: true }
           },
           required: []
         }
@@ -2347,7 +2356,8 @@ Google Slides:
 - image/png (.png) - PNG (first slide only)
 - image/svg+xml (.svg) - SVG (first slide only)
 - application/vnd.oasis.opendocument.presentation (.odp) - OpenDocument`
-            }
+            },
+            supportsAllDrives: { type: "boolean", description: "Whether to support shared drives", optional: true }
           },
           required: ["fileId", "mimeType"]
         }
@@ -5201,10 +5211,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           fileMetadata.properties = args.properties;
         }
 
-        const result = await drive.files.create({
+        const createParams: any = {
           requestBody: fileMetadata,
           fields: 'id,name,mimeType,parents,createdTime,modifiedTime'
-        });
+        };
+
+        if (args.supportsAllDrives !== undefined) {
+          createParams.supportsAllDrives = args.supportsAllDrives;
+        }
+
+        const result = await drive.files.create(createParams);
 
         return {
           content: [{
@@ -5272,11 +5288,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           fileMetadata.properties = args.properties;
         }
 
-        const result = await drive.files.update({
+        const updateParams: any = {
           fileId: args.fileId,
           requestBody: fileMetadata,
           fields: 'id,name,mimeType,parents,modifiedTime,trashed'
-        });
+        };
+
+        if (args.supportsAllDrives !== undefined) {
+          updateParams.supportsAllDrives = args.supportsAllDrives;
+        }
+
+        const result = await drive.files.update(updateParams);
 
         return {
           content: [{
@@ -5343,6 +5365,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (args.corpora) {
           params.corpora = args.corpora;
         }
+        if (args.includeItemsFromAllDrives !== undefined) {
+          params.includeItemsFromAllDrives = args.includeItemsFromAllDrives;
+        }
+        if (args.supportsAllDrives !== undefined) {
+          params.supportsAllDrives = args.supportsAllDrives;
+        }
 
         const result = await drive.files.list(params);
 
@@ -5406,10 +5434,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         const args = validation.data;
 
-        const result = await drive.files.export({
+        const exportParams: any = {
           fileId: args.fileId,
           mimeType: args.mimeType
-        }, {
+        };
+
+        if (args.supportsAllDrives !== undefined) {
+          exportParams.supportsAllDrives = args.supportsAllDrives;
+        }
+
+        const result = await drive.files.export(exportParams, {
           responseType: 'arraybuffer'
         });
 

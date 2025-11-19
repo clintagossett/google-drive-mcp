@@ -1,0 +1,26 @@
+{
+  "sharedDrive": {
+    "testFolderId": "REPLACE_WITH_YOUR_SHARED_DRIVE_FOLDER_ID",
+    "testFolderName": "MCP Integration Tests",
+    "description": "This folder is used for automated integration testing. Test files are created and cleaned up automatically."
+  },
+  "testSettings": {
+    "cleanupAfterTests": true,
+    "preserveTestArtifacts": false,
+    "verbose": true,
+    "testFilePrefix": "TEST_",
+    "maxTestRuntime": 300000
+  },
+  "oauth": {
+    "credentialsPath": "~/.config/google-drive-collaboration-mcp/tokens.json"
+  },
+  "instructions": {
+    "setup": [
+      "1. Copy this file to 'test-config.json' in the same directory",
+      "2. Replace 'testFolderId' with your Shared Drive folder ID",
+      "3. Ensure you have OAuth credentials configured",
+      "4. Run 'npm run test:integration' to execute tests"
+    ],
+    "note": "test-config.json is gitignored to protect your Shared Drive configuration"
+  }
+}

@@ -1,155 +1,127 @@
-import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { createMCPClient, closeMCPClient, callTool } from '../helpers/mcp-client.js';
+import { assertValidMCPResponse, assertSuccess } from '../helpers/assertions.js';
+import { TEST_CONFIG, skipIfNoIntegration } from '../helpers/test-env.js';
 
-// Schema definition (matches src/index.ts)
-const DocsReplaceAllTextSchema = z.object({
-  documentId: z.string().min(1, "Document ID is required"),
-  containsText: z.string().min(1, "Search text is required"),
-  replaceText: z.string(),
-  matchCase: z.boolean().optional()
-});
+describe('docs_replaceAllText - Integration Tests', () => {
+  skipIfNoIntegration();
 
-describe('docs_replaceAllText - Unit Tests', () => {
-  describe('Schema Validation', () => {
-    it('should validate correct parameters', () => {
-      const validInput = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        containsText: 'old text',
-        replaceText: 'new text',
-        matchCase: true
-      };
+  let client: Client;
+  const testDocId = TEST_CONFIG.oauthDocument;
 
-      const result = DocsReplaceAllTextSchema.safeParse(validInput);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(validInput);
-      }
+  beforeAll(async () => {
+    const result = await createMCPClient({
+      serverPath: TEST_CONFIG.serverPath,
+      serverArgs: TEST_CONFIG.serverArgs,
+      env: TEST_CONFIG.env
     });
-
-    it('should validate without matchCase (optional parameter)', () => {
-      const validInput = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        containsText: 'find this',
-        replaceText: 'replace with this'
-      };
-
-      const result = DocsReplaceAllTextSchema.safeParse(validInput);
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.matchCase).toBeUndefined();
-      }
-    });
-
-    it('should reject missing documentId', () => {
-      const invalidInput = {
-        containsText: 'search',
-        replaceText: 'replace'
-      };
-
-      const result = DocsReplaceAllTextSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-    });
-
-    it('should reject empty documentId', () => {
-      const invalidInput = {
-        documentId: '',
-        containsText: 'search',
-        replaceText: 'replace'
-      };
-
-      const result = DocsReplaceAllTextSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.errors[0].message).toBe('Document ID is required');
-      }
-    });
-
-    it('should reject missing containsText', () => {
-      const invalidInput = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        replaceText: 'replace'
-      };
-
-      const result = DocsReplaceAllTextSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-    });
-
-    it('should reject empty containsText', () => {
-      const invalidInput = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        containsText: '',
-        replaceText: 'replace'
-      };
-
-      const result = DocsReplaceAllTextSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.errors[0].message).toBe('Search text is required');
-      }
-    });
-
-    it('should accept empty replaceText (delete operation)', () => {
-      const validInput = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        containsText: 'remove this',
-        replaceText: ''
-      };
-
-      const result = DocsReplaceAllTextSchema.safeParse(validInput);
-      expect(result.success).toBe(true);
-    });
-
-    it('should accept special characters in text', () => {
-      const validInput = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        containsText: '$price: 100',
-        replaceText: '$price: 200'
-      };
-
-      const result = DocsReplaceAllTextSchema.safeParse(validInput);
-      expect(result.success).toBe(true);
-    });
+    client = result.client;
   });
 
-  describe('API Request Formation', () => {
-    it('should form correct batchUpdate request structure with matchCase', () => {
-      const input = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        containsText: 'old',
-        replaceText: 'new',
-        matchCase: true
-      };
-
-      const expectedRequest = {
-        documentId: input.documentId,
-        requestBody: {
-          requests: [{
-            replaceAllText: {
-              containsText: {
-                text: input.containsText,
-                matchCase: true
-              },
-              replaceText: input.replaceText
-            }
-          }]
-        }
-      };
-
-      expect(expectedRequest.requestBody.requests[0].replaceAllText.containsText.text).toBe(input.containsText);
-      expect(expectedRequest.requestBody.requests[0].replaceAllText.replaceText).toBe(input.replaceText);
-      expect(expectedRequest.requestBody.requests[0].replaceAllText.containsText.matchCase).toBe(true);
-    });
-
-    it('should default matchCase to false when not provided', () => {
-      const input = {
-        documentId: '1CIeAIWDqN_s1g9b7V2h79VpFjlrPM15VYuZ09zsNM9w',
-        containsText: 'search',
-        replaceText: 'replace'
-      };
-
-      // matchCase should default to false in the handler
-      const matchCase = input.matchCase ?? false;
-      expect(matchCase).toBe(false);
-    });
+  afterAll(async () => {
+    if (client) {
+      await closeMCPClient(client);
+    }
   });
+
+  it('should successfully replace text in a document (case-insensitive)', async () => {
+    // First, add test content
+    const insertResponse = await callTool(client, 'updateGoogleDoc', {
+      documentId: testDocId,
+      content: '\n\nTest REPLACE content for integration test\n'
+    });
+    assertSuccess(insertResponse);
+
+    // Replace "replace" (case-insensitive)
+    const replaceResponse = await callTool(client, 'docs_replaceAllText', {
+      documentId: testDocId,
+      containsText: 'replace',
+      replaceText: 'REPLACED',
+      matchCase: false
+    });
+
+    assertValidMCPResponse(replaceResponse);
+    assertSuccess(replaceResponse);
+
+    expect(replaceResponse.content).toBeDefined();
+    expect(replaceResponse.content[0].text).toContain('Successfully replaced');
+    expect(replaceResponse.content[0].text).toMatch(/\d+ occurrence/);
+  }, 60000);
+
+  it('should replace text with case-sensitive matching', async () => {
+    // Add mixed-case content
+    await callTool(client, 'updateGoogleDoc', {
+      documentId: testDocId,
+      content: '\n\nTest CASE case CaSe for case sensitivity\n'
+    });
+
+    // Replace only lowercase "case" with matchCase=true
+    const replaceResponse = await callTool(client, 'docs_replaceAllText', {
+      documentId: testDocId,
+      containsText: 'case',
+      replaceText: 'REPLACED',
+      matchCase: true
+    });
+
+    assertValidMCPResponse(replaceResponse);
+    assertSuccess(replaceResponse);
+
+    // Should only replace lowercase instances
+    expect(replaceResponse.content[0].text).toContain('occurrence');
+  }, 60000);
+
+  it('should replace text with empty string (deletion)', async () => {
+    // Add content with marker
+    await callTool(client, 'updateGoogleDoc', {
+      documentId: testDocId,
+      content: '\n\nRemove [DELETE_ME] this marker\n'
+    });
+
+    // Replace marker with empty string
+    const replaceResponse = await callTool(client, 'docs_replaceAllText', {
+      documentId: testDocId,
+      containsText: '[DELETE_ME] ',
+      replaceText: ''
+    });
+
+    assertValidMCPResponse(replaceResponse);
+    assertSuccess(replaceResponse);
+    expect(replaceResponse.content[0].text).toMatch(/\d+ occurrence/);
+  }, 60000);
+
+  it('should return 0 occurrences when text not found', async () => {
+    const replaceResponse = await callTool(client, 'docs_replaceAllText', {
+      documentId: testDocId,
+      containsText: 'ThisTextDoesNotExistInTheDocument12345',
+      replaceText: 'something'
+    });
+
+    assertValidMCPResponse(replaceResponse);
+    assertSuccess(replaceResponse);
+    expect(replaceResponse.content[0].text).toContain('0 occurrence');
+  }, 60000);
+
+  it('should return error for invalid document ID', async () => {
+    const response = await callTool(client, 'docs_replaceAllText', {
+      documentId: 'invalid-document-id-12345',
+      containsText: 'test',
+      replaceText: 'replaced'
+    });
+
+    assertValidMCPResponse(response);
+    expect(response.isError || response.content[0].text.includes('error')).toBeTruthy();
+  }, 60000);
+
+  it('should validate empty containsText through schema', async () => {
+    const response = await callTool(client, 'docs_replaceAllText', {
+      documentId: testDocId,
+      containsText: '',
+      replaceText: 'test'
+    });
+
+    assertValidMCPResponse(response);
+    expect(response.isError).toBe(true);
+    expect(response.content[0].text).toContain('Search text is required');
+  }, 60000);
 });
