@@ -11,22 +11,36 @@ A Model Context Protocol (MCP) server that provides secure integration with Goog
 - **MCP Resource Protocol**: Files accessible as MCP resources for reading content
 - **Secure Authentication**: OAuth 2.0 with automatic token refresh
 
-## ⚠️ Breaking Changes (Phase 1 - Issue #2)
+## ⚠️ Breaking Changes (Issue #2 Complete)
 
-**Date**: 2025-11-18
+**Date**: 2025-11-19
 
-As part of enforcing 1:1 API design principles, the following convenience tools have been removed. Use the composable 1:1 API tools instead:
+As part of enforcing 1:1 API design principles, the following tools have been removed/replaced:
 
-### Removed Tools:
-1. **`createGoogleDoc`** - Use `drive.files.create` + `docs_insertText` + `docs_updateParagraphStyle`
-2. **`updateGoogleDoc`** - Use `docs_get` + `docs_deleteContentRange` + `docs_insertText`
-3. **`createGoogleSlides`** - Use `drive.files.create` + Slides 1:1 tools
-4. **`updateGoogleSlides`** - Use Slides 1:1 tools for batch updates
-5. **`getGoogleSheetContent`** - Use `sheets_batchGetValues` (returns raw API response)
+### Phase 1 (2025-11-18) - Critical Violations:
+1. **`createGoogleDoc`** ❌ - Use `drive_createFile` + `docs_insertText` + `docs_updateTextStyle`
+2. **`updateGoogleDoc`** ❌ - Use `docs_get` + `docs_deleteContentRange` + `docs_insertText`
+3. **`createGoogleSlides`** ❌ - Use `drive_createFile` + Slides 1:1 tools
+4. **`updateGoogleSlides`** ❌ - Use Slides 1:1 tools for batch updates
+5. **`getGoogleSheetContent`** ❌ - Use `sheets_batchGetValues` (returns raw API response)
+
+### Phase 2 (2025-11-19) - Remaining Violations:
+6. **`createGoogleSheet`** ❌ - Use `sheets_createSpreadsheet` + `sheets_appendValues` + `drive_updateFile` (to move)
+7. **`updateGoogleSheet`** ❌ - Use `sheets_batchUpdateValues` (more comprehensive)
+8. **`getGoogleSlidesContent`** ❌ - Use `slides_get` ✅ (new 1:1 tool, returns raw API response)
+
+### Added Tools:
+- **`slides_get`** ✅ - Proper 1:1 mapping to `presentations.get` API (replaces `getGoogleSlidesContent`)
 
 **Migration Guide**: See [Issue #2](https://github.com/clintagossett/google-drive-mcp/issues/2) for detailed migration examples.
 
 **Why**: These tools violated 1:1 API mapping principles by combining multiple operations, hiding API calls, and adding business logic. The new approach provides better composability, transparency, and access to full API capabilities.
+
+**Impact**:
+- ✅ 8 compliant Drive tools remain
+- ❌ 8 violating convenience tools removed
+- ✅ 1 new 1:1 tool added (`slides_get`)
+- ✅ All 797 tests passing
 
 ## Example Usage
 

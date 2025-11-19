@@ -486,17 +486,6 @@ const DriveDeletePermissionSchema = z.object({
   supportsAllDrives: z.boolean().optional()
 });
 
-const CreateGoogleSheetSchema = z.object({
-  name: z.string().min(1, "Sheet name is required"),
-  data: z.array(z.array(z.string())),
-  parentFolderId: z.string().optional()
-});
-
-const UpdateGoogleSheetSchema = z.object({
-  spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
-  range: z.string().min(1, "Range is required"),
-  data: z.array(z.array(z.string()))
-});
 
 // Comprehensive RepeatCellRequest schema - replaces formatGoogleSheetCells, formatGoogleSheetText, formatGoogleSheetNumbers
 const SheetsRepeatCellSchema = z.object({
@@ -992,10 +981,6 @@ const DocsUpdateParagraphStyleSchema = z.object({
 });
 
 // Google Slides Formatting Schemas
-const GetGoogleSlidesContentSchema = z.object({
-  presentationId: z.string().min(1, "Presentation ID is required"),
-  slideIndex: z.number().min(0).optional()
-});
 
 const SlidesUpdateTextStyleSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
@@ -1079,6 +1064,10 @@ const SlidesCreateShapeSchema = z.object({
     blue: z.number().min(0).max(1).optional(),
     alpha: z.number().min(0).max(1).optional()
   }).optional()
+});
+
+const SlidesGetSchema = z.object({
+  presentationId: z.string().min(1, "Presentation ID is required")
 });
 
 // Phase 1 Google Docs API Tools
@@ -2015,39 +2004,6 @@ Google Slides:
             supportsAllDrives: { type: "boolean", description: "Include shared drives", optional: true }
           },
           required: ["fileId", "permissionId"]
-        }
-      },
-      {
-        name: "createGoogleSheet",
-        description: "Create a new Google Sheet",
-        inputSchema: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Sheet name" },
-            data: {
-              type: "array",
-              description: "Data as array of arrays",
-              items: { type: "array", items: { type: "string" } }
-            },
-            parentFolderId: { type: "string", description: "Parent folder ID (defaults to root)", optional: true }
-          },
-          required: ["name", "data"]
-        }
-      },
-      {
-        name: "updateGoogleSheet",
-        description: "Update an existing Google Sheet",
-        inputSchema: {
-          type: "object",
-          properties: {
-            spreadsheetId: { type: "string", description: "Sheet ID" },
-            range: { type: "string", description: "Range to update" },
-            data: {
-              type: "array",
-              items: { type: "array", items: { type: "string" } }
-            }
-          },
-          required: ["spreadsheetId", "range", "data"]
         }
       },
       {
@@ -3352,18 +3308,6 @@ Google Slides:
         }
       },
       {
-        name: "getGoogleSlidesContent",
-        description: "Get content of Google Slides with element IDs for formatting",
-        inputSchema: {
-          type: "object",
-          properties: {
-            presentationId: { type: "string", description: "Presentation ID" },
-            slideIndex: { type: "number", description: "Specific slide index (optional)", optional: true }
-          },
-          required: ["presentationId"]
-        }
-      },
-      {
         name: "slides_updateTextStyle",
         description: "Apply text formatting to elements in Google Slides",
         inputSchema: {
@@ -3534,6 +3478,17 @@ Google Slides:
             }
           },
           required: ["presentationId", "pageObjectId", "shapeType", "x", "y", "width", "height"]
+        }
+      },
+      {
+        name: "slides_get",
+        description: "Get a Google Slides presentation. Maps directly to presentations.get in Google Slides API. Returns complete Presentation object with all content, slides, and metadata as raw JSON.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            presentationId: { type: "string", description: "The ID of the presentation" }
+          },
+          required: ["presentationId"]
         }
       }
     ]
@@ -4515,82 +4470,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "createGoogleSheet": {
-        const validation = CreateGoogleSheetSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const parentFolderId = await resolveFolderId(args.parentFolderId);
-
-        // Check if spreadsheet already exists
-        const existingFileId = await checkFileExists(args.name, parentFolderId);
-        if (existingFileId) {
-          return errorResponse(
-            `A spreadsheet named "${args.name}" already exists in this location. ` +
-            `To update it, use updateGoogleSheet with spreadsheetId: ${existingFileId}`
-          );
-        }
-        const sheets = google.sheets({ version: 'v4', auth: authClient });
-        
-        // Create spreadsheet with initial sheet
-        const spreadsheet = await sheets.spreadsheets.create({
-          requestBody: { 
-            properties: { title: args.name },
-            sheets: [{
-              properties: {
-                sheetId: 0,
-                title: 'Sheet1',
-                gridProperties: {
-                  rowCount: Math.max(args.data.length, 1000),
-                  columnCount: Math.max(args.data[0]?.length || 0, 26)
-                }
-              }
-            }]
-          }
-        });
-
-        await drive.files.update({
-          fileId: spreadsheet.data.spreadsheetId || '',
-          addParents: parentFolderId,
-          fields: 'id, name, webViewLink'
-        });
-
-        // Now update with data
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: spreadsheet.data.spreadsheetId!,
-          range: 'Sheet1!A1',
-          valueInputOption: 'RAW',
-          requestBody: { values: args.data }
-        });
-
-        return {
-          content: [{ type: "text", text: `Created Google Sheet: ${args.name}\nID: ${spreadsheet.data.spreadsheetId}` }],
-          isError: false
-        };
-      }
-
-      case "updateGoogleSheet": {
-        const validation = UpdateGoogleSheetSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const sheets = google.sheets({ version: 'v4', auth: authClient });
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: args.spreadsheetId,
-          range: args.range,
-          valueInputOption: 'RAW',
-          requestBody: { values: args.data }
-        });
-
-        return {
-          content: [{ type: "text", text: `Updated Google Sheet range: ${args.range}` }],
-          isError: false
-        };
-      }
 
       case "sheets_repeatCell": {
         const validation = SheetsRepeatCellSchema.safeParse(request.params.arguments);
@@ -7713,65 +7592,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       }
 
-      case "getGoogleSlidesContent": {
-        const validation = GetGoogleSlidesContentSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const slidesService = google.slides({ version: 'v1', auth: authClient });
-        const presentation = await slidesService.presentations.get({
-          presentationId: args.presentationId
-        });
-
-        if (!presentation.data.slides) {
-          return errorResponse("No slides found in presentation");
-        }
-
-        let content = 'Presentation content with element IDs:\n\n';
-        const slides = args.slideIndex !== undefined 
-          ? [presentation.data.slides[args.slideIndex]]
-          : presentation.data.slides;
-
-        slides.forEach((slide, index) => {
-          if (!slide || !slide.objectId) return;
-          
-          content += `\nSlide ${args.slideIndex ?? index} (ID: ${slide.objectId}):\n`;
-          content += '----------------------------\n';
-
-          if (slide.pageElements) {
-            slide.pageElements.forEach((element) => {
-              if (!element.objectId) return;
-
-              if (element.shape?.text) {
-                content += `  Text Box (ID: ${element.objectId}):\n`;
-                const textElements = element.shape.text.textElements || [];
-                let text = '';
-                textElements.forEach((textElement) => {
-                  if (textElement.textRun?.content) {
-                    text += textElement.textRun.content;
-                  }
-                });
-                content += `    "${text.trim()}"\n`;
-              } else if (element.shape) {
-                content += `  Shape (ID: ${element.objectId}): ${element.shape.shapeType || 'Unknown'}\n`;
-              } else if (element.image) {
-                content += `  Image (ID: ${element.objectId})\n`;
-              } else if (element.video) {
-                content += `  Video (ID: ${element.objectId})\n`;
-              } else if (element.table) {
-                content += `  Table (ID: ${element.objectId})\n`;
-              }
-            });
-          }
-        });
-
-        return {
-          content: [{ type: "text", text: content }],
-          isError: false
-        };
-      }
 
       case "slides_updateTextStyle": {
         const validation = SlidesUpdateTextStyleSchema.safeParse(request.params.arguments);
@@ -8211,6 +8031,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{ type: "text", text: `Created ${args.shapeType} shape with ID: ${elementId}` }],
           isError: false
         };
+      }
+
+      case "slides_get": {
+        const validation = SlidesGetSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        try {
+          const slidesService = google.slides({ version: 'v1', auth: authClient });
+          const presentation = await slidesService.presentations.get({
+            presentationId: args.presentationId
+          });
+
+          // Return raw API response as JSON
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(presentation.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to get presentation');
+        }
       }
 
       default:
