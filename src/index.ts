@@ -439,6 +439,53 @@ const DriveDeleteReplySchema = z.object({
   replyId: z.string().min(1, "Reply ID is required")
 });
 
+// Phase 4: Sharing & Permissions - 1:1 Mappings
+// Maps to permissions.create in Google Drive API v3
+const DriveCreatePermissionSchema = z.object({
+  fileId: z.string().min(1, "File ID is required"),
+  role: z.enum(["owner", "organizer", "fileOrganizer", "writer", "commenter", "reader"]),
+  type: z.enum(["user", "group", "domain", "anyone"]),
+  emailAddress: z.string().email().optional(),
+  domain: z.string().optional(),
+  sendNotificationEmail: z.boolean().optional(),
+  emailMessage: z.string().optional(),
+  supportsAllDrives: z.boolean().optional()
+});
+
+// Maps to permissions.list in Google Drive API v3
+const DriveListPermissionsSchema = z.object({
+  fileId: z.string().min(1, "File ID is required"),
+  pageSize: z.number().min(1).max(100).optional(),
+  pageToken: z.string().optional(),
+  fields: z.string().optional(),
+  supportsAllDrives: z.boolean().optional()
+});
+
+// Maps to permissions.get in Google Drive API v3
+const DriveGetPermissionSchema = z.object({
+  fileId: z.string().min(1, "File ID is required"),
+  permissionId: z.string().min(1, "Permission ID is required"),
+  fields: z.string().optional(),
+  supportsAllDrives: z.boolean().optional()
+});
+
+// Maps to permissions.update in Google Drive API v3
+const DriveUpdatePermissionSchema = z.object({
+  fileId: z.string().min(1, "File ID is required"),
+  permissionId: z.string().min(1, "Permission ID is required"),
+  role: z.enum(["owner", "organizer", "fileOrganizer", "writer", "commenter", "reader"]),
+  removeExpiration: z.boolean().optional(),
+  transferOwnership: z.boolean().optional(),
+  supportsAllDrives: z.boolean().optional()
+});
+
+// Maps to permissions.delete in Google Drive API v3
+const DriveDeletePermissionSchema = z.object({
+  fileId: z.string().min(1, "File ID is required"),
+  permissionId: z.string().min(1, "Permission ID is required"),
+  supportsAllDrives: z.boolean().optional()
+});
+
 const CreateGoogleSheetSchema = z.object({
   name: z.string().min(1, "Sheet name is required"),
   data: z.array(z.array(z.string())),
@@ -1880,6 +1927,94 @@ Google Slides:
             replyId: { type: "string", description: "Reply ID" }
           },
           required: ["fileId", "commentId", "replyId"]
+        }
+      },
+      {
+        name: "drive_createPermission",
+        description: "Grant access to a file. Maps directly to permissions.create in Drive API v3. Share with users, groups, domains, or anyone.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            fileId: { type: "string", description: "File ID" },
+            role: {
+              type: "string",
+              enum: ["owner", "organizer", "fileOrganizer", "writer", "commenter", "reader"],
+              description: "Access level to grant"
+            },
+            type: {
+              type: "string",
+              enum: ["user", "group", "domain", "anyone"],
+              description: "Permission type"
+            },
+            emailAddress: { type: "string", description: "Email address (required for user/group types)", optional: true },
+            domain: { type: "string", description: "Domain name (required for domain type)", optional: true },
+            sendNotificationEmail: { type: "boolean", description: "Send notification email (default: true)", optional: true },
+            emailMessage: { type: "string", description: "Custom email message", optional: true },
+            supportsAllDrives: { type: "boolean", description: "Include shared drives", optional: true }
+          },
+          required: ["fileId", "role", "type"]
+        }
+      },
+      {
+        name: "drive_listPermissions",
+        description: "List all permissions on a file. Maps directly to permissions.list in Drive API v3. Returns array of permissions with role, type, and user details.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            fileId: { type: "string", description: "File ID" },
+            pageSize: { type: "number", description: "Max results per page (1-100, default 100)", optional: true },
+            pageToken: { type: "string", description: "Token for next page", optional: true },
+            fields: { type: "string", description: "Fields to include (e.g. 'permissions(id,role,emailAddress)')", optional: true },
+            supportsAllDrives: { type: "boolean", description: "Include shared drives", optional: true }
+          },
+          required: ["fileId"]
+        }
+      },
+      {
+        name: "drive_getPermission",
+        description: "Get permission details by ID. Maps directly to permissions.get in Drive API v3. Returns specific permission metadata including role and user info.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            fileId: { type: "string", description: "File ID" },
+            permissionId: { type: "string", description: "Permission ID" },
+            fields: { type: "string", description: "Fields to include (e.g. 'id,role,emailAddress,expirationTime')", optional: true },
+            supportsAllDrives: { type: "boolean", description: "Include shared drives", optional: true }
+          },
+          required: ["fileId", "permissionId"]
+        }
+      },
+      {
+        name: "drive_updatePermission",
+        description: "Update permission role or settings. Maps directly to permissions.update in Drive API v3. Can change access level or transfer ownership.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            fileId: { type: "string", description: "File ID" },
+            permissionId: { type: "string", description: "Permission ID" },
+            role: {
+              type: "string",
+              enum: ["owner", "organizer", "fileOrganizer", "writer", "commenter", "reader"],
+              description: "New access level"
+            },
+            removeExpiration: { type: "boolean", description: "Remove expiration time", optional: true },
+            transferOwnership: { type: "boolean", description: "Transfer ownership (required when changing to owner role)", optional: true },
+            supportsAllDrives: { type: "boolean", description: "Include shared drives", optional: true }
+          },
+          required: ["fileId", "permissionId", "role"]
+        }
+      },
+      {
+        name: "drive_deletePermission",
+        description: "Revoke access to a file. Maps directly to permissions.delete in Drive API v3. Removes permission completely.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            fileId: { type: "string", description: "File ID" },
+            permissionId: { type: "string", description: "Permission ID to delete" },
+            supportsAllDrives: { type: "boolean", description: "Include shared drives", optional: true }
+          },
+          required: ["fileId", "permissionId"]
         }
       },
       {
@@ -4245,6 +4380,136 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: JSON.stringify({ success: true, replyId: args.replyId, message: "Reply deleted" }, null, 2)
+          }],
+          isError: false
+        };
+      }
+
+      case "drive_createPermission": {
+        const validation = DriveCreatePermissionSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        const requestBody: any = {
+          role: args.role,
+          type: args.type
+        };
+
+        if (args.emailAddress) requestBody.emailAddress = args.emailAddress;
+        if (args.domain) requestBody.domain = args.domain;
+
+        const response = await drive.permissions.create({
+          fileId: args.fileId,
+          requestBody,
+          sendNotificationEmail: args.sendNotificationEmail,
+          emailMessage: args.emailMessage,
+          supportsAllDrives: args.supportsAllDrives
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(response.data, null, 2)
+          }],
+          isError: false
+        };
+      }
+
+      case "drive_listPermissions": {
+        const validation = DriveListPermissionsSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        const response = await drive.permissions.list({
+          fileId: args.fileId,
+          pageSize: args.pageSize,
+          pageToken: args.pageToken,
+          fields: args.fields,
+          supportsAllDrives: args.supportsAllDrives
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(response.data, null, 2)
+          }],
+          isError: false
+        };
+      }
+
+      case "drive_getPermission": {
+        const validation = DriveGetPermissionSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        const response = await drive.permissions.get({
+          fileId: args.fileId,
+          permissionId: args.permissionId,
+          fields: args.fields,
+          supportsAllDrives: args.supportsAllDrives
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(response.data, null, 2)
+          }],
+          isError: false
+        };
+      }
+
+      case "drive_updatePermission": {
+        const validation = DriveUpdatePermissionSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        const requestBody: any = {
+          role: args.role
+        };
+
+        const response = await drive.permissions.update({
+          fileId: args.fileId,
+          permissionId: args.permissionId,
+          requestBody,
+          removeExpiration: args.removeExpiration,
+          transferOwnership: args.transferOwnership,
+          supportsAllDrives: args.supportsAllDrives
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(response.data, null, 2)
+          }],
+          isError: false
+        };
+      }
+
+      case "drive_deletePermission": {
+        const validation = DriveDeletePermissionSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        await drive.permissions.delete({
+          fileId: args.fileId,
+          permissionId: args.permissionId,
+          supportsAllDrives: args.supportsAllDrives
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ success: true, permissionId: args.permissionId, message: "Permission deleted" }, null, 2)
           }],
           isError: false
         };
