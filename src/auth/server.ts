@@ -4,6 +4,7 @@ import { TokenManager } from './tokenManager.js';
 import http from 'http';
 import open from 'open';
 import { loadCredentials } from './client.js';
+import { google } from 'googleapis';
 
 // OAuth scopes for Google Drive, Docs, Sheets, and Slides
 const SCOPES = [
@@ -64,6 +65,39 @@ export class AuthServer {
         // Get the path where tokens were saved
         const tokenPath = this.tokenManager.getTokenPath();
 
+        // Fetch user info and scopes
+        let userEmail = 'Unknown';
+        let userName = 'Unknown User';
+        const grantedScopes = tokens.scope ? tokens.scope.split(' ') : SCOPES;
+
+        try {
+          // Set credentials on the flow client to make API calls
+          this.flowOAuth2Client.setCredentials(tokens);
+          const drive = google.drive({ version: 'v3', auth: this.flowOAuth2Client });
+          const aboutResponse = await drive.about.get({ fields: 'user' });
+          userEmail = aboutResponse.data.user?.emailAddress || userEmail;
+          userName = aboutResponse.data.user?.displayName || userName;
+        } catch (apiError) {
+          // If we can't fetch user info, just skip it
+          console.error('Could not fetch user info:', apiError);
+        }
+
+        // Scope descriptions
+        const scopeDescriptions: Record<string, string> = {
+          'https://www.googleapis.com/auth/drive': 'Full access to Google Drive',
+          'https://www.googleapis.com/auth/drive.file': 'Access to files created by this app',
+          'https://www.googleapis.com/auth/drive.readonly': 'Read-only access to Google Drive',
+          'https://www.googleapis.com/auth/documents': 'Access to Google Docs',
+          'https://www.googleapis.com/auth/spreadsheets': 'Access to Google Sheets',
+          'https://www.googleapis.com/auth/presentations': 'Access to Google Slides'
+        };
+
+        // Generate scope list HTML
+        const scopeListHtml = grantedScopes.map(scope => {
+          const description = scopeDescriptions[scope] || 'Unknown scope';
+          return `<li><strong>${scope.split('/').pop()}</strong> - ${description}</li>`;
+        }).join('');
+
         // Send a more informative HTML response including the path
         res.send(`
           <!DOCTYPE html>
@@ -73,19 +107,46 @@ export class AuthServer {
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <title>Authentication Successful</title>
               <style>
-                  body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f4f4f4; margin: 0; }
-                  .container { text-align: center; padding: 2em; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                  h1 { color: #4CAF50; }
-                  p { color: #333; margin-bottom: 0.5em; }
-                  code { background-color: #eee; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; }
+                  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); margin: 0; padding: 20px; }
+                  .container { max-width: 600px; width: 100%; padding: 2em; background-color: #fff; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+                  h1 { color: #4CAF50; margin-top: 0; font-size: 2em; }
+                  h2 { color: #555; font-size: 1.3em; margin-top: 1.5em; margin-bottom: 0.5em; border-bottom: 2px solid #f0f0f0; padding-bottom: 0.3em; }
+                  p { color: #333; margin-bottom: 0.5em; line-height: 1.6; }
+                  .user-info { background-color: #f8f9fa; padding: 1em; border-radius: 8px; margin: 1em 0; }
+                  .user-email { font-weight: bold; color: #667eea; font-size: 1.1em; }
+                  .user-name { color: #555; margin-top: 0.3em; }
+                  code { background-color: #eee; padding: 0.3em 0.5em; border-radius: 4px; font-size: 0.85em; word-break: break-all; display: inline-block; max-width: 100%; }
+                  ul { list-style: none; padding: 0; margin: 1em 0; }
+                  li { padding: 0.5em; margin: 0.3em 0; background-color: #f8f9fa; border-radius: 6px; border-left: 3px solid #4CAF50; }
+                  .close-msg { margin-top: 2em; padding: 1em; background-color: #e8f5e9; border-radius: 6px; color: #2e7d32; }
+                  .checkmark { font-size: 3em; color: #4CAF50; margin-bottom: 0.3em; }
               </style>
           </head>
           <body>
               <div class="container">
-                  <h1>Authentication Successful!</h1>
-                  <p>Your authentication tokens have been saved successfully to:</p>
+                  <div style="text-align: center;">
+                      <div class="checkmark">✓</div>
+                      <h1>Authentication Successful!</h1>
+                  </div>
+
+                  <h2>Authenticated User</h2>
+                  <div class="user-info">
+                      <div class="user-email">${userEmail}</div>
+                      <div class="user-name">${userName}</div>
+                  </div>
+
+                  <h2>Granted Permissions</h2>
+                  <ul>
+                      ${scopeListHtml}
+                  </ul>
+
+                  <h2>Token Storage</h2>
+                  <p>Your authentication tokens have been saved to:</p>
                   <p><code>${tokenPath}</code></p>
-                  <p>You can now close this browser window.</p>
+
+                  <div class="close-msg">
+                      <strong>You're all set!</strong> You can now close this browser window and start using the Google Drive MCP server.
+                  </div>
               </div>
           </body>
           </html>
