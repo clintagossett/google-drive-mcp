@@ -834,10 +834,6 @@ const FormatGoogleDocParagraphSchema = z.object({
   spaceBelow: z.number().optional()
 });
 
-const GetGoogleDocContentSchema = z.object({
-  documentId: z.string().min(1, "Document ID is required")
-});
-
 // Google Slides Formatting Schemas
 const GetGoogleSlidesContentSchema = z.object({
   presentationId: z.string().min(1, "Presentation ID is required"),
@@ -2373,17 +2369,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             spaceBelow: { type: "number", description: "Space below paragraph in points", optional: true }
           },
           required: ["documentId", "startIndex", "endIndex"]
-        }
-      },
-      {
-        name: "getGoogleDocContent",
-        description: "Get content of a Google Doc with text indices for formatting",
-        inputSchema: {
-          type: "object",
-          properties: {
-            documentId: { type: "string", description: "Document ID" }
-          },
-          required: ["documentId"]
         }
       },
       {
@@ -5720,57 +5705,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         
         return {
           content: [{ type: "text", text: `Applied paragraph formatting to range ${args.startIndex}-${args.endIndex}` }],
-          isError: false
-        };
-      }
-
-      case "getGoogleDocContent": {
-        const validation = GetGoogleDocContentSchema.safeParse(request.params.arguments);
-        if (!validation.success) {
-          return errorResponse(validation.error.errors[0].message);
-        }
-        const args = validation.data;
-
-        const docs = google.docs({ version: 'v1', auth: authClient });
-        const document = await docs.documents.get({ documentId: args.documentId });
-
-        let content = '';
-        const segments: Array<{text: string, startIndex: number, endIndex: number}> = [];
-
-        // Extract text content with indices from API
-        if (document.data.body?.content) {
-          for (const element of document.data.body.content) {
-            if (element.paragraph?.elements) {
-              for (const textElement of element.paragraph.elements) {
-                if (textElement.textRun?.content &&
-                    textElement.startIndex !== undefined &&
-                    textElement.endIndex !== undefined) {
-                  segments.push({
-                    text: textElement.textRun.content,
-                    startIndex: textElement.startIndex,
-                    endIndex: textElement.endIndex
-                  });
-                  content += textElement.textRun.content;
-                }
-              }
-            }
-          }
-        }
-        
-        // Format the response to show text with indices
-        let formattedContent = 'Document content with indices:\n\n';
-
-        // Display each segment with its actual API indices
-        for (const segment of segments) {
-          const text = segment.text.replace(/\n/g, '\\n');
-          formattedContent += `[${segment.startIndex}-${segment.endIndex}] ${text}\n`;
-        }
-
-        return {
-          content: [{
-            type: "text",
-            text: formattedContent + `\nTotal segments: ${segments.length}`
-          }],
           isError: false
         };
       }

@@ -6,13 +6,13 @@ This document tracks known bugs, limitations, and workarounds for the Google Dri
 
 ## CRITICAL: Index Offset Bug with Table of Contents
 
-**Status**: ✅ FIXED in v2.0.0 (2025-11-18)
-**Severity**: High - Makes formatting unusable in documents with TOC
+**Status**: ✅ RESOLVED by removing `getGoogleDocContent` (2025-11-18)
+**Severity**: High - Made formatting unusable in documents with TOC
 **Discovered**: 2025-11-18
 **Root Cause Found**: 2025-11-18
-**Fixed**: 2025-11-18
-**Affects**: `formatGoogleDocText`, `formatGoogleDocParagraph`, and all write operations
-**Actual Bug Location**: `getGoogleDocContent` (was using custom indices instead of API indices)
+**Resolution**: 2025-11-18 - Removed `getGoogleDocContent` tool (violated 1:1 API design principles)
+**Affected Tools**: `getGoogleDocContent` (now removed)
+**Reason for Removal**: Tool violated 1:1 API mapping design principles by adding custom processing/filtering
 
 ### Problem Description
 
@@ -172,118 +172,34 @@ writeIndex = readIndex + TOC_SIZE_IN_CHARACTERS
 4. Measure TOC character count manually or programmatically
 5. Use that as offset for all write operations
 
-### The Fix (IDENTIFIED)
+### The Resolution
 
-**Fix Location**: `src/index.ts` lines 5738-5758 (`getGoogleDocContent` handler)
+**Resolution Date**: 2025-11-18
+**Action Taken**: Removed `getGoogleDocContent` tool entirely
 
-**Current Code (WRONG)**:
-```typescript
-let currentIndex = 1;
-const segments: Array<{text: string, startIndex: number, endIndex: number}> = [];
+**Why Removed Instead of Fixed**:
+1. Tool violated 1:1 API mapping design principles
+2. Added custom processing/filtering of API responses
+3. Created convenience wrapper instead of thin API layer
+4. See `docs/development/GETGOOGLEDOCCONTENT_ANALYSIS.md` for full analysis
 
-if (document.data.body?.content) {
-  for (const element of document.data.body.content) {
-    if (element.paragraph?.elements) {
-      for (const textElement of element.paragraph.elements) {
-        if (textElement.textRun?.content) {
-          const text = textElement.textRun.content;
-          segments.push({
-            text,
-            startIndex: currentIndex,  // ← WRONG: manual counting
-            endIndex: currentIndex + text.length
-          });
-          content += text;
-          currentIndex += text.length;  // ← WRONG: manual increment
-        }
-      }
-    }
-  }
-}
-```
+**Proper Approach**:
+- Use `docs_get` tool (when implemented) to get raw document structure
+- Parse the document structure directly using Google API indices
+- No custom index counting or processing needed
 
-**Fixed Code (CORRECT)**:
-```typescript
-const segments: Array<{text: string, startIndex: number, endIndex: number}> = [];
+**Migration Path**:
+- `getGoogleDocContent` users should wait for `docs_get` implementation
+- `docs_get` will return complete document structure with all API indices
+- AI agents can parse the structure as needed
 
-if (document.data.body?.content) {
-  for (const element of document.data.body.content) {
-    // Process all elements that have indices, not just paragraphs
-    if (element.paragraph?.elements) {
-      for (const textElement of element.paragraph.elements) {
-        if (textElement.textRun?.content &&
-            textElement.startIndex !== undefined &&
-            textElement.endIndex !== undefined) {
-          segments.push({
-            text: textElement.textRun.content,
-            startIndex: textElement.startIndex,  // ✅ RIGHT: use API index
-            endIndex: textElement.endIndex        // ✅ RIGHT: use API index
-          });
-          content += textElement.textRun.content;
-        }
-      }
-    }
-  }
-}
-```
+### Current Status
 
-**Key Changes**:
-1. ✅ Remove manual index counting (`let currentIndex = 1`)
-2. ✅ Use `textElement.startIndex` from API (not manual counting)
-3. ✅ Use `textElement.endIndex` from API (not calculated length)
-4. ✅ Add safety checks for `undefined` indices
+**Tool Removed**: `getGoogleDocContent` has been removed from the codebase as of 2025-11-18.
 
-**Benefits**:
-- ✅ Read and write indices will match
-- ✅ Works with TOC, tables, all elements
-- ✅ No offset calculations needed
-- ✅ Follows Google API conventions
+**No Workaround Needed**: The bug no longer exists because the tool has been removed.
 
-**Breaking Change Warning**:
-- ⚠️ Indices will change for documents with TOC/tables
-- ⚠️ Users with saved indices will need to re-read documents
-- ⚠️ Documents without TOC: No impact (indices stay the same)
-
-### Workaround for AI Agents
-
-Until this is fixed, use this workaround when formatting documents with TOC:
-
-```javascript
-// 1. Calculate offset once per document
-async function calculateTOCOffset(documentId) {
-  // Have user add "TESTMARKER" at known location
-  const content = await getGoogleDocContent(documentId);
-  const readIndex = findIndex(content, "TESTMARKER");
-
-  // Try formatting at different offsets until it works
-  for (let offset = 0; offset < 3000; offset += 100) {
-    await formatGoogleDocText({
-      documentId,
-      startIndex: readIndex + offset,
-      endIndex: readIndex + offset + 10,
-      foregroundColor: { red: 0, green: 1, blue: 0 }
-    });
-
-    // Ask user: "Did TESTMARKER turn green?"
-    // If yes, return offset
-  }
-}
-
-// 2. Use offset for all operations
-const TOC_OFFSET = await calculateTOCOffset(documentId);
-
-function formatWithOffset(startIndex, endIndex, formatting) {
-  return formatGoogleDocText({
-    documentId,
-    startIndex: startIndex + TOC_OFFSET,
-    endIndex: endIndex + TOC_OFFSET,
-    ...formatting
-  });
-}
-```
-
-### Alternative Workaround
-
-**For users**: Remove the TOC, do all formatting, then re-insert TOC. This avoids the bug entirely.
+**Future Implementation**: When `docs_get` is implemented (proper 1:1 API mapping), it will return raw Google API responses with correct indices, eliminating this entire class of bugs.
 
 ### Related Issues
 
