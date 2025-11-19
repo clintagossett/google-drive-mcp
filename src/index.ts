@@ -1149,6 +1149,11 @@ const DocsDeletePositionedObjectSchema = z.object({
   objectId: z.string().min(1, "Object ID is required")
 });
 
+const DocsGetSchema = z.object({
+  documentId: z.string().min(1, "Document ID is required"),
+  includeTabsContent: z.boolean().optional()
+});
+
 const DocsInsertSectionBreakSchema = z.object({
   documentId: z.string().min(1, "Document ID is required"),
   index: z.number().int().min(1, "Index must be at least 1"),
@@ -2812,6 +2817,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             objectId: { type: "string", description: "The positioned object ID to delete" }
           },
           required: ["documentId", "objectId"]
+        }
+      },
+      {
+        name: "docs_get",
+        description: "Get a Google Docs document. Maps to documents.get in Google Docs API. Returns complete Document object with all content, styles, and metadata as raw JSON.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            documentId: { type: "string", description: "The ID of the document" },
+            includeTabsContent: { type: "boolean", description: "Whether to include tab content (default: false)", optional: true }
+          },
+          required: ["documentId"]
         }
       },
       {
@@ -6742,6 +6759,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         } catch (error: any) {
           return errorResponse(error.message || 'Failed to delete positioned object');
+        }
+      }
+
+      case "docs_get": {
+        const validation = DocsGetSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+        const args = validation.data;
+
+        const docs = google.docs({ version: 'v1', auth: authClient });
+        try {
+          const document = await docs.documents.get({
+            documentId: args.documentId,
+            ...(args.includeTabsContent !== undefined && { includeTabsContent: args.includeTabsContent })
+          });
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(document.data, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(error.message || 'Failed to get document');
         }
       }
 
