@@ -112,72 +112,6 @@ function getMimeTypeFromFilename(filename: string): string {
 
 
 /**
- * Resolve a slash-delimited path (e.g. "/some/folder") within Google Drive
- * into a folder ID. Creates folders if they don't exist.
- */
-async function resolvePath(pathStr: string): Promise<string> {
-  if (!pathStr || pathStr === '/') return 'root';
-
-  // Note: This function is called after ensureAuthenticated, so drive should exist
-  const parts = pathStr.replace(/^\/+|\/+$/g, '').split('/');
-  let currentFolderId: string = 'root';
-
-  for (const part of parts) {
-    if (!part) continue;
-    let response = await drive.files.list({
-      q: `'${currentFolderId}' in parents and name = '${part}' and mimeType = '${FOLDER_MIME_TYPE}' and trashed = false`,
-      fields: 'files(id)',
-      spaces: 'drive',
-      supportsAllDrives: true,
-      includeItemsFromAllDrives: true
-    });
-
-    // If the folder segment doesn't exist, create it
-    if (!response.data.files?.length) {
-      const folderMetadata = {
-        name: part,
-        mimeType: FOLDER_MIME_TYPE,
-        parents: [currentFolderId]
-      };
-      const folder = await drive.files.create({
-        requestBody: folderMetadata,
-        fields: 'id',
-        supportsAllDrives: true
-      });
-
-      if (!folder.data.id) {
-        throw new Error(`Failed to create intermediate folder: ${part}`);
-      }
-
-      currentFolderId = folder.data.id;
-    } else {
-      // Folder exists, proceed deeper
-      currentFolderId = response.data.files[0].id!;
-    }
-  }
-
-  return currentFolderId;
-}
-
-
-/**
- * Resolve a folder ID or path.
- * If it's a path (starts with '/'), resolve it.
- * If no folder is provided, return 'root'.
- */
-async function resolveFolderId(input: string | undefined): Promise<string> {
-  if (!input) return 'root';
-
-  if (input.startsWith('/')) {
-    // Input is a path
-    return resolvePath(input);
-  } else {
-    // Input is a folder ID, return as-is
-    return input;
-  }
-}
-
-/**
  * For text-based files, ensure they have a valid extension.
  */
 function validateTextFileExtension(name: string) {
@@ -230,33 +164,6 @@ function convertA1ToGridRange(a1Notation: string, sheetId: number): any {
   }
   
   return gridRange;
-}
-
-/**
- * Check if a file with the given name already exists in the specified folder.
- * Returns the file ID if it exists, null otherwise.
- */
-async function checkFileExists(name: string, parentFolderId: string = 'root'): Promise<string | null> {
-  try {
-    const escapedName = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-    const query = `name = '${escapedName}' and '${parentFolderId}' in parents and trashed = false`;
-    
-    const res = await drive.files.list({
-      q: query,
-      fields: 'files(id, name, mimeType)',
-      pageSize: 1,
-      supportsAllDrives: true,
-      includeItemsFromAllDrives: true
-    });
-    
-    if (res.data.files && res.data.files.length > 0) {
-      return res.data.files[0].id || null;
-    }
-    return null;
-  } catch (error) {
-    log('Error checking file existence:', error);
-    return null;
-  }
 }
 
 // -----------------------------------------------------------------------------
