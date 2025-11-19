@@ -504,6 +504,11 @@ const AuthListScopesSchema = z.object({
   // No parameters needed - reads from current auth token
 });
 
+// Clear authentication tokens and force re-authentication
+const AuthClearTokensSchema = z.object({
+  // No parameters needed
+});
+
 // Comprehensive RepeatCellRequest schema - replaces formatGoogleSheetCells, formatGoogleSheetText, formatGoogleSheetNumbers
 const SheetsRepeatCellSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
@@ -2607,6 +2612,14 @@ Google Slides:
       {
         name: "auth_listScopes",
         description: "Show granted OAuth scopes and token information. Helps diagnose scope-related permission issues.",
+        inputSchema: {
+          type: "object",
+          properties: {}
+        }
+      },
+      {
+        name: "auth_clearTokens",
+        description: "Clear authentication tokens and force re-authentication. Useful for switching accounts or fixing auth issues. Server will automatically re-authenticate on next tool call.",
         inputSchema: {
           type: "object",
           properties: {}
@@ -5958,6 +5971,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }],
           isError: false
         };
+      }
+
+      case "auth_clearTokens": {
+        const validation = AuthClearTokensSchema.safeParse(request.params.arguments);
+        if (!validation.success) {
+          return errorResponse(validation.error.errors[0].message);
+        }
+
+        try {
+          // Import TokenManager to clear tokens
+          const { TokenManager } = await import('./auth.js');
+          const tokenManager = new TokenManager(authClient);
+          await tokenManager.clearTokens();
+          const tokenPath = tokenManager.getTokenPath();
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                success: true,
+                message: "Authentication tokens cleared successfully",
+                tokenPath,
+                nextSteps: [
+                  "MCP server will automatically re-authenticate on next tool call",
+                  "Or manually run: npm run auth"
+                ]
+              }, null, 2)
+            }],
+            isError: false
+          };
+        } catch (error: any) {
+          return errorResponse(`Failed to clear tokens: ${error.message || error}`);
+        }
       }
 
       case "sheets_repeatCell": {
