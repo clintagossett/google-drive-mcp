@@ -1,46 +1,60 @@
-# Google Drive MCP Server
+# Google Drive Collaboration MCP
 
-A Model Context Protocol (MCP) server that provides secure integration with Google Drive, Docs, Sheets, and Slides. It allows Claude Desktop and other MCP clients to manage files in Google Drive through a standardized interface.
+[![npm version](https://img.shields.io/npm/v/@clintagossett/google-drive-collaboration-mcp)](https://www.npmjs.com/package/@clintagossett/google-drive-collaboration-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![MCP](https://img.shields.io/badge/MCP-Server-blue)](https://modelcontextprotocol.io)
+
+A comprehensive Model Context Protocol (MCP) server providing Claude Desktop and other MCP clients with full access to Google Workspace through 100+ tools covering Drive, Docs, Sheets, and Slides APIs.
+
+## Quick Start
+
+```bash
+# Install via npm
+npm install -g @clintagossett/google-drive-collaboration-mcp
+
+# Or use with npx (no installation)
+npx @clintagossett/google-drive-collaboration-mcp
+```
+
+Add to Claude Desktop config (`~/.claude.json`):
+```json
+{
+  "mcpServers": {
+    "google-drive": {
+      "command": "npx",
+      "args": ["-y", "@clintagossett/google-drive-collaboration-mcp"]
+    }
+  }
+}
+```
 
 ## Features
 
-- **Multi-format Support**: Work with Google Docs, Sheets, Slides, and regular files
-- **File Management**: Create, update, delete, rename, and move files and folders
-- **Advanced Search**: Search across your entire Google Drive
-- **Folder Navigation**: List and navigate through folder hierarchies with path support (e.g., `/Work/Projects`)
-- **MCP Resource Protocol**: Files accessible as MCP resources for reading content
-- **Secure Authentication**: OAuth 2.0 with automatic token refresh
+### 🚀 Comprehensive API Coverage
+- **Google Drive** (23 tools): Files, folders, comments, permissions, search
+- **Google Docs** (34 tools): Text formatting, tables, images, document structure
+- **Google Sheets** (44 tools): Data manipulation, formulas, formatting, ranges
+- **Google Slides** (27 tools): Presentations, slides, shapes, layouts
 
-## ⚠️ Breaking Changes (Issue #2 Complete)
+### 🔒 Secure & Reliable
+- **OAuth 2.0**: Secure authentication with automatic token refresh
+- **Shared Drives**: Full support for Google Workspace shared drives
+- **Type Safety**: Built with TypeScript in strict mode
+- **Well Tested**: 1,173 unit tests (100% passing)
 
-**Date**: 2025-11-19
+### 🎯 Developer Friendly
+- **1:1 API Mapping**: Each tool maps directly to one Google API method
+- **Thin Layer**: Pass-through to Google APIs, no hidden business logic
+- **Complete Parameters**: All Google API parameters available
+- **Comprehensive Docs**: Full API references and design documentation
 
-As part of enforcing 1:1 API design principles, the following tools have been removed/replaced:
+## What's New (v0.0.3)
 
-### Phase 1 (2025-11-18) - Critical Violations:
-1. **`createGoogleDoc`** ❌ - Use `drive_createFile` + `docs_insertText` + `docs_updateTextStyle`
-2. **`updateGoogleDoc`** ❌ - Use `docs_get` + `docs_deleteContentRange` + `docs_insertText`
-3. **`createGoogleSlides`** ❌ - Use `drive_createFile` + Slides 1:1 tools
-4. **`updateGoogleSlides`** ❌ - Use Slides 1:1 tools for batch updates
-5. **`getGoogleSheetContent`** ❌ - Use `sheets_batchGetValues` (returns raw API response)
+- **Bug Fix**: `drive_getFile` and `drive_listFiles` now filter out trashed files by default
+- Added `includeTrashed` parameter to both tools for explicit trash access
+- All 1,173 tests passing
 
-### Phase 2 (2025-11-19) - Remaining Violations:
-6. **`createGoogleSheet`** ❌ - Use `sheets_createSpreadsheet` + `sheets_appendValues` + `drive_updateFile` (to move)
-7. **`updateGoogleSheet`** ❌ - Use `sheets_batchUpdateValues` (more comprehensive)
-8. **`getGoogleSlidesContent`** ❌ - Use `slides_get` ✅ (new 1:1 tool, returns raw API response)
-
-### Added Tools:
-- **`slides_get`** ✅ - Proper 1:1 mapping to `presentations.get` API (replaces `getGoogleSlidesContent`)
-
-**Migration Guide**: See [Issue #2](https://github.com/clintagossett/google-drive-mcp/issues/2) for detailed migration examples.
-
-**Why**: These tools violated 1:1 API mapping principles by combining multiple operations, hiding API calls, and adding business logic. The new approach provides better composability, transparency, and access to full API capabilities.
-
-**Impact**:
-- ✅ 8 compliant Drive tools remain
-- ❌ 8 violating convenience tools removed
-- ✅ 1 new 1:1 tool added (`slides_get`)
-- ✅ All 797 tests passing
+See [CHANGELOG.md](./CHANGELOG.md) for full version history.
 
 ## Example Usage
 
@@ -964,18 +978,26 @@ MIT - See LICENSE file for details
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+**Quick Links**:
+- 🐛 [Report a Bug](https://github.com/clintagossett/google-drive-mcp/issues/new?template=bug_report.md)
+- ✨ [Request a Feature](https://github.com/clintagossett/google-drive-mcp/issues/new?template=feature_request.md)
+- 💬 [Discussions](https://github.com/clintagossett/google-drive-mcp/discussions)
+- 📖 [Developer Docs](./docs/development/)
 
-## Support
+## Support & Resources
 
-- 📚 [Documentation](https://github.com/piotr-agier/google-drive-mcp)
-- 🐛 [Issue Tracker](https://github.com/piotr-agier/google-drive-mcp/issues)
+- **Documentation**: [GitHub Repository](https://github.com/clintagossett/google-drive-mcp)
+- **Issue Tracker**: [GitHub Issues](https://github.com/clintagossett/google-drive-mcp/issues)
+- **Changelog**: [CHANGELOG.md](./CHANGELOG.md)
+- **npm Package**: [@clintagossett/google-drive-collaboration-mcp](https://www.npmjs.com/package/@clintagossett/google-drive-collaboration-mcp)
+
+## License
+
+MIT - See [LICENSE](./LICENSE) file for details.
+
+Original project by [Piotr Agier](https://github.com/piotr-agier/google-drive-mcp). Extended by Clint Gossett.
 
 ## Acknowledgments
 
