@@ -9,7 +9,7 @@ This is a fork of [@piotr-agier/google-drive-mcp](https://github.com/piotr-agier
 **MANDATORY Reading Order for ALL New Work**:
 1. **design/DESIGN_PRINCIPLES.md** - MUST read first, especially the warning at the top
 2. **design/LESSONS_LEARNED.md** - Learn from past mistakes (DO NOT SKIP!)
-3. **design/sheets_api_reference.md** OR **design/docs_api_reference.md** - API reference
+3. **design/api_reference_sheets.md** OR **design/api_reference_docs.md** - API reference
 4. **Current phase plan** - Step-by-step implementation guide
 
 **Key Rule**: TESTS ARE PART OF IMPLEMENTATION
@@ -29,8 +29,8 @@ This is a fork of [@piotr-agier/google-drive-mcp](https://github.com/piotr-agier
 3. **design/API_MAPPING_STRATEGY.md** - How to map APIs to MCP tools
 
 ### API References
-1. **design/sheets_api_reference.md** - Complete Google Sheets API audit (50+ operations)
-2. **design/docs_api_reference.md** - Complete Google Docs API audit (34 operations, 100% implemented)
+1. **design/api_reference_sheets.md** - Complete Google Sheets API audit (50+ operations)
+2. **design/api_reference_docs.md** - Complete Google Docs API audit (34 operations, 100% implemented)
 
 ### Implementation Plans
 1. **design/SHEETS_PHASE_1_COMPLETE.md** - Phase 1 summary (10 core data tools implemented)
@@ -131,7 +131,7 @@ NEVER batch implement multiple tools before writing tests!
 
 ### 🔄 Next Implementation
 **Google Sheets API - Phase 2: Row/Column/Range Operations** (10 tools planned)
-- See `design/sheets_api_reference.md` for complete plan
+- See `design/api_reference_sheets.md` for complete plan
 
 ### 📋 Planned (Future)
 **Google Drive Comments API** (3 tools)

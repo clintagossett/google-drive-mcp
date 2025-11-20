@@ -286,7 +286,7 @@ Now have complete control over:
 
 ## Documentation
 
-**Reference Document**: `design/drive_api_reference.md`
+**Reference Document**: `design/api_reference_drive.md`
 - Complete API audit (28 methods catalogued)
 - 23 methods in-scope (82%)
 - Prioritized implementation phases

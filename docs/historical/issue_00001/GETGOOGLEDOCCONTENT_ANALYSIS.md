@@ -44,7 +44,7 @@ Total segments: 16
 
 ### What SHOULD exist (per design principles)
 
-According to `design/docs_api_reference.md`:
+According to `design/api_reference_docs.md`:
 
 ```markdown
 ### 1. `documents.get`

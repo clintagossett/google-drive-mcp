@@ -1098,7 +1098,7 @@ And: No offset calculation should be needed
 
 ### Design Documents
 - `design/DESIGN_PRINCIPLES.md` - Project design principles
-- `design/docs_api_reference.md` - Google Docs API reference
+- `design/api_reference_docs.md` - Google Docs API reference
 
 ### Google Documentation
 - [Google Docs API Structure](https://developers.google.com/docs/api/concepts/structure)

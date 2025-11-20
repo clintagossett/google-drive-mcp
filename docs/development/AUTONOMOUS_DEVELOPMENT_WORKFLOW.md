@@ -38,7 +38,7 @@ gh issue view <issue-number>
 1. `design/DESIGN_PRINCIPLES.md` - Master reference for all decisions
 2. `design/LESSONS_LEARNED.md` - Past mistakes to avoid
 3. `design/API_MAPPING_STRATEGY.md` - How to map APIs to tools
-4. Relevant API reference (`docs_api_reference.md`, `sheets_api_reference.md`, etc.)
+4. Relevant API reference (`api_reference_docs.md`, `api_reference_sheets.md`, etc.)
 
 ### Step 3: Create Historical Documentation Structure
 
@@ -778,7 +778,7 @@ EOF
 4. Completion
    - Verify 23/23 tools implemented
    - All tests passing
-   - Update drive_api_reference.md (100% complete)
+   - Update api_reference_drive.md (100% complete)
    - Post final metrics to GitHub
    - Close issue
 ```

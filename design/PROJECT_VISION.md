@@ -275,8 +275,8 @@ Modern AI models can handle API complexity. The benefit of full control outweigh
 ### Documentation Structure
 - `design/DESIGN_PRINCIPLES.md` - Core implementation guidelines
 - `design/LESSONS_LEARNED.md` - Mistakes to avoid
-- `design/sheets_api_reference.md` - Complete Sheets API audit
-- `design/docs_api_reference.md` - Complete Docs API audit
+- `design/api_reference_sheets.md` - Complete Sheets API audit
+- `design/api_reference_docs.md` - Complete Docs API audit
 - `design/PROJECT_VISION.md` (this file) - Purpose and direction
 
 ### Testing

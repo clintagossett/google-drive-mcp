@@ -268,7 +268,7 @@ describe('docs_deleteContentRange Integration', () => {
 - Test edge cases
 
 ### Step 7: Update Documentation
-- Mark tool as implemented in `design/docs_api_reference.md`
+- Mark tool as implemented in `design/api_reference_docs.md`
 - Update coverage statistics
 
 ---
@@ -323,7 +323,7 @@ Execute tools in this order (HIGH priority first):
 - [ ] Test edge cases from API constraints
 
 ### Documentation
-- [ ] Tool marked as implemented in `docs_api_reference.md`
+- [ ] Tool marked as implemented in `api_reference_docs.md`
 - [ ] Coverage statistics updated
 - [ ] Examples added if needed
 
@@ -344,7 +344,7 @@ Execute tools in this order (HIGH priority first):
 - [ ] Coverage ≥80% for new code
 
 ### Documentation
-- [ ] All tools documented in `docs_api_reference.md`
+- [ ] All tools documented in `api_reference_docs.md`
 - [ ] Coverage statistics updated (from 9% to ~25%)
 - [ ] Examples provided for each tool
 
@@ -370,7 +370,7 @@ tests/
 └── helpers/ (existing)
 
 design/
-├── docs_api_reference.md (updated)
+├── api_reference_docs.md (updated)
 └── PHASE_1_PLAN.md (this file)
 ```
 

@@ -51,7 +51,7 @@ If you find yourself thinking "I'll write tests later" or "Tests can wait until 
 - ✅ Avoid over-abstraction
 - ❌ Never hide API capabilities behind convenience methods
 
-**Validation**: Before any release, verify API coverage in `design/docs_api_reference.md`
+**Validation**: Before any release, verify API coverage in `design/api_reference_docs.md`
 
 ---
 
@@ -420,8 +420,8 @@ design/API_MAPPING_STRATEGY.md
 
 **API References**: `lowercase_with_underscores.md`
 ```
-design/docs_api_reference.md
-design/sheets_api_reference.md (future)
+design/api_reference_docs.md
+design/api_reference_sheets.md
 ```
 
 **Test Files**: `lowercase-with-dashes.test.ts`
@@ -491,7 +491,7 @@ try {
 ### Rule 1: Update API Reference After Implementation (MANDATORY)
 
 When implementing a tool:
-1. ✅ Mark as implemented in `design/docs_api_reference.md`
+1. ✅ Mark as implemented in `design/api_reference_docs.md`
 2. ✅ Update coverage statistics
 3. ✅ Add example usage if helpful
 
@@ -538,7 +538,7 @@ If test requirements change:
 Use this checklist when implementing a new tool:
 
 ### Before Writing Code
-- [ ] Read `design/docs_api_reference.md` for API details
+- [ ] Read `design/api_reference_docs.md` for API details
 - [ ] Read `design/API_MAPPING_STRATEGY.md` for mapping pattern
 - [ ] Read `design/PHASE_1_PLAN.md` (or current phase) for implementation workflow
 - [ ] Read this document (`DESIGN_PRINCIPLES.md`) for rules
@@ -563,7 +563,7 @@ Use this checklist when implementing a new tool:
 - [ ] **CRITICAL**: A tool is NOT complete until tests are written and passing
 
 ### Documentation
-- [ ] Update `design/docs_api_reference.md` (mark as implemented)
+- [ ] Update `design/api_reference_docs.md` (mark as implemented)
 - [ ] Update coverage statistics
 - [ ] Add helpful examples if needed
 - [ ] Update this checklist if process changed
@@ -591,7 +591,7 @@ Tests:
 - {n} integration tests
 - Coverage: {percentage}%
 
-Refs: design/docs_api_reference.md #{tool number}
+Refs: design/api_reference_docs.md #{tool number}
 ```
 
 ---
@@ -757,7 +757,7 @@ Or even better (TDD):
 1. **DESIGN_PRINCIPLES.md** (this file) - Read FIRST
 2. **LESSONS_LEARNED.md** - Learn from past mistakes (READ THIS!)
 3. **API_MAPPING_STRATEGY.md** - Understand mapping pattern
-4. **docs_api_reference.md** or **sheets_api_reference.md** - API details for implementation
+4. **api_reference_docs.md** or **api_reference_sheets.md** - API details for implementation
 5. **PHASE_1_PLAN.md** (or current phase) - Step-by-step workflow
 6. **TESTING_STRATEGY.md** - Complete testing approach
 
@@ -817,7 +817,7 @@ If you believe a rule should change:
 **Before ANY implementation, read**:
 1. This document
 2. `API_MAPPING_STRATEGY.md`
-3. `docs_api_reference.md`
+3. `api_reference_docs.md`
 4. Current phase plan
 
 **THIS DOCUMENT IS YOUR GUIDE. FOLLOW IT.**

@@ -1290,4 +1290,4 @@ For each new thin-layer tool:
 - **Official API**: https://developers.google.com/sheets/api/reference/rest
 - **Design Principles**: `design/DESIGN_PRINCIPLES.md`
 - **API Mapping Strategy**: `design/API_MAPPING_STRATEGY.md`
-- **Docs API Reference**: `design/docs_api_reference.md` (reference implementation)
+- **Docs API Reference**: `design/api_reference_docs.md` (reference implementation)

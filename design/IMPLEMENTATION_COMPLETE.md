@@ -230,7 +230,7 @@ The Google Drive MCP server now provides **complete 1:1 coverage of all 34 Googl
    - Added 31 tool handlers
    - Lines of code added: ~2,400
 
-2. **`design/docs_api_reference.md`** - API documentation
+2. **`design/api_reference_docs.md`** - API documentation
    - Updated API coverage statistics
    - Marked all phases complete
    - Updated summary tables
@@ -390,7 +390,7 @@ await callTool('docs_insertInlineImage', {
 ## Documentation Updates
 
 ### Updated Documents
-1. **`design/docs_api_reference.md`**
+1. **`design/api_reference_docs.md`**
    - All 34 request types marked as implemented
    - 100% coverage statistics
    - Phase completion status updated

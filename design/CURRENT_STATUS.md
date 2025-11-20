@@ -154,6 +154,6 @@ If additional tools are required, prioritize in this order:
 
 - **Design Principles**: design/DESIGN_PRINCIPLES.md
 - **Lessons Learned**: design/LESSONS_LEARNED.md
-- **API Reference**: design/sheets_api_reference.md
+- **API Reference**: design/api_reference_sheets.md
 - **Phase 1 Summary**: design/SHEETS_PHASE_1_COMPLETE.md
 - **Project Instructions**: CLAUDE.md

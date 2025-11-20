@@ -477,7 +477,7 @@ Use the public test folder for testing:
 
 ## Related Documentation
 
-- **API Reference**: design/sheets_api_reference.md
+- **API Reference**: design/api_reference_sheets.md
 - **Design Principles**: design/DESIGN_PRINCIPLES.md
 - **API Mapping Strategy**: design/API_MAPPING_STRATEGY.md
 - **Phase 2 Plan**: TBD
