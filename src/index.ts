@@ -2124,7 +2124,23 @@ const TOOLS_LIST = [
       },
       {
         name: "drive_exportFile",
-        description: "Export a Google Docs/Sheets/Slides file to a different format. Maps directly to files.export in Drive API v3. Returns base64-encoded content. Max 10MB export size.",
+        description: `Export a Google Docs/Sheets/Slides file to a different format. Maps directly to files.export in Drive API v3. Returns base64-encoded content. Max 10MB export size.
+
+✨ EFFICIENCY BENEFIT: For Google Docs, exporting to text/markdown or text/plain provides 60-65% token reduction compared to docs_get.
+
+WHEN TO USE:
+✓ Need document content/text without formatting details
+✓ Reading/analyzing document text efficiently
+✓ Creating summaries or extracting information
+✓ Searching for specific content
+✓ Maximum token efficiency (especially for large documents)
+✓ Read-only operations
+
+BEST FORMATS FOR CONTENT EXTRACTION:
+• text/markdown - Preserves headings, lists, basic formatting (~65% smaller than docs_get)
+• text/plain - Raw text only, most efficient
+
+NOTE: This is read-only. For editing documents, use docs_get + editing tools. For structure analysis or formatting work, use docs_get.`,
         inputSchema: {
           type: "object",
           properties: {
@@ -3629,7 +3645,24 @@ Google Slides:
       },
       {
         name: "docs_get",
-        description: "Get a Google Docs document. Maps to documents.get in Google Docs API. Returns complete Document object with all content, styles, and metadata as raw JSON.",
+        description: `Get a Google Docs document. Maps to documents.get in Google Docs API. Returns complete Document object with all content, styles, and metadata as raw JSON.
+
+⚠️ TOKEN WARNING: Returns full document structure with all formatting metadata. Can consume 25k+ tokens for moderate documents.
+
+WHEN TO USE:
+✓ Need detailed formatting information (fonts, colors, styles)
+✓ Analyzing document structure (heading hierarchy, table layouts)
+✓ Programmatic editing/manipulation of specific elements
+✓ Need precise positioning for content insertions
+✓ Working with or modifying formatting properties
+
+WHEN NOT TO USE (use drive_exportFile instead):
+✗ Only need document content/text
+✗ Creating summaries or extracting information
+✗ Searching for specific content
+✗ Want maximum token efficiency (drive_exportFile to markdown = 60-65% reduction)
+
+For content-only needs, use drive_exportFile with mimeType 'text/markdown' or 'text/plain' instead.`,
         inputSchema: {
           type: "object",
           properties: {

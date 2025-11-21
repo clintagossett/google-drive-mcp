@@ -29,6 +29,10 @@ If you find yourself thinking "I'll write tests later" or "Tests can wait until 
 ## Table of Contents
 
 1. [Core Philosophy](#core-philosophy)
+   - Claude Must Never Be Blocked
+   - DRY (Do Not Repeat Yourself)
+   - Composability Over Complexity
+   - Descriptive Tool Design Over Tool Proliferation
 2. [API Mapping Rules](#api-mapping-rules)
 3. [Code Structure Rules](#code-structure-rules)
 4. [Testing Requirements](#testing-requirements)
@@ -89,6 +93,54 @@ docs_updateTextStyle(docId, range, { bold: true })
 // BAD: One complex tool
 docs_insertFormattedText(docId, index, "Header", { bold: true, size: 14 })
 ```
+
+---
+
+### 4. Descriptive Tool Design Over Tool Proliferation
+
+**Principle**: Guide AI agent behavior through rich tool descriptions rather than creating specialized tools.
+
+**Implementation**:
+- ✅ Enhance tool descriptions with usage guidance
+- ✅ Include token warnings for high-cost operations
+- ✅ Provide efficiency tips and alternatives
+- ✅ Quantify benefits (e.g., "60-65% token reduction")
+- ❌ Avoid creating "light" or "slim" variants of tools
+
+**Why This Works**:
+- AI agents read and understand tool descriptions
+- Clear guidance enables intelligent tool selection
+- Reduces maintenance burden (fewer tools to test)
+- Preserves API fidelity (no hidden abstractions)
+
+**Example Pattern**:
+```typescript
+{
+  name: "docs_get",
+  description: `
+⚠️ TOKEN WARNING: Returns full document structure (~26k tokens).
+
+WHEN TO USE:
+✓ Need formatting/structure analysis
+✓ Programmatic editing required
+
+WHEN NOT TO USE (use drive_exportFile instead):
+✗ Only need content/text
+✗ Want token efficiency (drive_exportFile = 65% reduction)
+
+For content-only needs, use drive_exportFile with mimeType 'text/markdown'.
+  `
+}
+```
+
+**Benefits Demonstrated**:
+- `docs_get`: ~26,319 tokens (full document)
+- `drive_exportFile` (markdown): ~9,435 tokens
+- **Savings**: 64.2% token reduction through smart tool choice
+
+**See Also**:
+- `docs/PERFORMANCE_GUIDE.md` - Complete optimization strategies
+- Issue #13 - Large response mitigation analysis
 
 ---
 

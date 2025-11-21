@@ -48,6 +48,19 @@ Add to Claude Desktop config (`~/.claude.json`):
 - **Complete Parameters**: All Google API parameters available
 - **Comprehensive Docs**: Full API references and design documentation
 
+### 🧠 AI-Optimized Design
+
+We optimize AI agent interactions through **descriptive tool design** rather than tool proliferation:
+
+- **Rich Tool Descriptions**: Tools include usage guidance, token warnings, and efficiency tips
+- **Intelligent Selection**: AI agents learn when to use `docs_get` vs `drive_exportFile` based on need
+- **No "Light" Variants**: Instead of creating `docs_get_light`, we guide agents to use `drive_exportFile` for content-only needs
+- **Measurable Benefits**: 60-65% token reduction for common operations through smart tool choice
+
+Example: Reading a Google Doc uses ~26k tokens with `docs_get` but only ~9k tokens (64% reduction) with `drive_exportFile` to markdown. Our tool descriptions help AI agents make this choice automatically.
+
+**See**: [Performance Guide](./docs/PERFORMANCE_GUIDE.md) for optimization strategies.
+
 ## What's New (v0.0.3)
 
 - **Bug Fix**: `drive_getFile` and `drive_listFiles` now filter out trashed files by default
