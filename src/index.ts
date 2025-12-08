@@ -72,6 +72,304 @@ const TEXT_MIME_TYPES = {
   txt: 'text/plain',
   md: 'text/markdown'
 };
+
+// Cache Infrastructure Constants (Issue #23)
+const CHARACTER_LIMIT = 25000;  // Max characters before truncation
+const CACHE_TTL_MS = 30 * 60 * 1000;  // 30 minutes cache TTL
+
+// -----------------------------------------------------------------------------
+// DOCUMENT CACHE (Issue #23 - Resource Cache Infrastructure)
+// -----------------------------------------------------------------------------
+interface CacheEntry {
+  content: any;       // Original API response
+  text: string;       // Extracted text content
+  fetchedAt: number;  // Timestamp for TTL management
+  type: 'doc' | 'sheet' | 'file';  // Resource type
+}
+
+const documentCache = new Map<string, CacheEntry>();
+
+/**
+ * Store content in cache with current timestamp
+ */
+function cacheStore(key: string, content: any, text: string, type: CacheEntry['type']): void {
+  documentCache.set(key, {
+    content,
+    text,
+    fetchedAt: Date.now(),
+    type
+  });
+  log('Cache store', { key, textLength: text.length, type });
+}
+
+/**
+ * Retrieve content from cache if not expired
+ * Returns null if entry doesn't exist or is expired
+ */
+function cacheGet(key: string): CacheEntry | null {
+  const entry = documentCache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  // Check TTL expiration
+  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
+    documentCache.delete(key);
+    log('Cache expired', { key });
+    return null;
+  }
+
+  return entry;
+}
+
+/**
+ * Remove expired entries from cache (housekeeping)
+ */
+function cacheCleanup(): number {
+  const now = Date.now();
+  let removedCount = 0;
+
+  for (const [key, entry] of documentCache.entries()) {
+    if (now - entry.fetchedAt > CACHE_TTL_MS) {
+      documentCache.delete(key);
+      removedCount++;
+    }
+  }
+
+  if (removedCount > 0) {
+    log('Cache cleanup', { removedCount, remaining: documentCache.size });
+  }
+
+  return removedCount;
+}
+
+/**
+ * Get cache statistics
+ */
+function cacheStats(): { size: number; entries: { key: string; type: string; age: number; textLength: number }[] } {
+  const now = Date.now();
+  const entries = Array.from(documentCache.entries()).map(([key, entry]) => ({
+    key,
+    type: entry.type,
+    age: Math.round((now - entry.fetchedAt) / 1000), // age in seconds
+    textLength: entry.text.length
+  }));
+
+  return {
+    size: documentCache.size,
+    entries
+  };
+}
+
+// -----------------------------------------------------------------------------
+// RESOURCE URI PARSER (Issue #23)
+// -----------------------------------------------------------------------------
+interface ParsedResourceUri {
+  valid: boolean;
+  type?: 'doc' | 'sheet' | 'file' | 'legacy';
+  resourceId?: string;
+  action?: 'content' | 'chunk' | 'structure' | 'values';
+  params?: {
+    start?: number;
+    end?: number;
+    range?: string;
+  };
+  error?: string;
+}
+
+/**
+ * Parse gdrive:// URIs into structured components
+ *
+ * Supported patterns:
+ * - gdrive:///{fileId}                         → legacy (original format)
+ * - gdrive://docs/{docId}/content              → full cached doc text
+ * - gdrive://docs/{docId}/chunk/{start}-{end}  → doc text slice
+ * - gdrive://docs/{docId}/structure            → doc headings/sections
+ * - gdrive://sheets/{id}/values/{range}        → sheet cell values
+ * - gdrive://files/{id}/content/{start}-{end}  → exported file content
+ */
+function parseResourceUri(uri: string): ParsedResourceUri {
+  // Legacy format: gdrive:///{fileId}
+  if (uri.startsWith('gdrive:///')) {
+    const fileId = uri.replace('gdrive:///', '');
+    if (!fileId) {
+      return { valid: false, error: 'Empty file ID in legacy URI' };
+    }
+    return { valid: true, type: 'legacy', resourceId: fileId };
+  }
+
+  // New format: gdrive://{type}/{id}/{action}[/{params}]
+  if (!uri.startsWith('gdrive://')) {
+    return { valid: false, error: 'Invalid URI scheme - must start with gdrive://' };
+  }
+
+  const path = uri.substring('gdrive://'.length);
+  const segments = path.split('/');
+
+  if (segments.length < 2) {
+    return { valid: false, error: 'URI must have at least type and resource ID' };
+  }
+
+  const resourceType = segments[0];
+  const resourceId = segments[1];
+  const action = segments[2];
+  const actionParams = segments[3];
+
+  if (!resourceId) {
+    return { valid: false, error: 'Missing resource ID' };
+  }
+
+  // Handle docs URIs
+  if (resourceType === 'docs') {
+    if (!action) {
+      return { valid: false, error: 'Docs URI requires action: content, chunk, or structure' };
+    }
+
+    if (action === 'content') {
+      return { valid: true, type: 'doc', resourceId, action: 'content' };
+    }
+
+    if (action === 'structure') {
+      return { valid: true, type: 'doc', resourceId, action: 'structure' };
+    }
+
+    if (action === 'chunk') {
+      if (!actionParams) {
+        return { valid: false, error: 'Chunk action requires range parameter (e.g., 0-5000)' };
+      }
+
+      const rangeMatch = actionParams.match(/^(\d+)-(\d+)$/);
+      if (!rangeMatch) {
+        return { valid: false, error: 'Invalid chunk range format. Use: {start}-{end} (e.g., 0-5000)' };
+      }
+
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+
+      if (start < 0) {
+        return { valid: false, error: 'Chunk start index cannot be negative' };
+      }
+
+      if (end <= start) {
+        return { valid: false, error: 'Chunk end index must be greater than start index' };
+      }
+
+      return { valid: true, type: 'doc', resourceId, action: 'chunk', params: { start, end } };
+    }
+
+    return { valid: false, error: `Unknown docs action: ${action}. Valid actions: content, chunk, structure` };
+  }
+
+  // Handle sheets URIs
+  if (resourceType === 'sheets') {
+    if (action !== 'values') {
+      return { valid: false, error: 'Sheets URI requires "values" action with range parameter' };
+    }
+
+    if (!actionParams) {
+      return { valid: false, error: 'Sheets values action requires range parameter (e.g., Sheet1!A1:B10)' };
+    }
+
+    // URL decode the range (it may be encoded)
+    const range = decodeURIComponent(actionParams);
+
+    return { valid: true, type: 'sheet', resourceId, action: 'values', params: { range } };
+  }
+
+  // Handle files URIs
+  if (resourceType === 'files') {
+    if (action !== 'content') {
+      return { valid: false, error: 'Files URI requires "content" action' };
+    }
+
+    if (!actionParams) {
+      // Full content without range
+      return { valid: true, type: 'file', resourceId, action: 'content' };
+    }
+
+    const rangeMatch = actionParams.match(/^(\d+)-(\d+)$/);
+    if (!rangeMatch) {
+      return { valid: false, error: 'Invalid content range format. Use: {start}-{end} (e.g., 0-5000)' };
+    }
+
+    const start = parseInt(rangeMatch[1], 10);
+    const end = parseInt(rangeMatch[2], 10);
+
+    if (start < 0) {
+      return { valid: false, error: 'Content start index cannot be negative' };
+    }
+
+    if (end <= start) {
+      return { valid: false, error: 'Content end index must be greater than start index' };
+    }
+
+    return { valid: true, type: 'file', resourceId, action: 'content', params: { start, end } };
+  }
+
+  return { valid: false, error: `Unknown resource type: ${resourceType}. Valid types: docs, sheets, files` };
+}
+
+/**
+ * Serve cached content based on parsed URI
+ * Returns null if cache miss, content string if hit
+ */
+function serveCachedContent(parsed: ParsedResourceUri): { content: string | null; error?: string; hint?: string } {
+  if (!parsed.valid || !parsed.resourceId) {
+    return { content: null, error: parsed.error };
+  }
+
+  // Legacy URIs don't use the cache
+  if (parsed.type === 'legacy') {
+    return { content: null, hint: 'Legacy URI format - use standard resource fetch' };
+  }
+
+  const cacheKey = parsed.resourceId;
+  const entry = cacheGet(cacheKey);
+
+  if (!entry) {
+    return {
+      content: null,
+      error: `Cache miss for resource: ${cacheKey}`,
+      hint: `First fetch the document using the appropriate tool (e.g., docs_getDocument) to populate the cache.`
+    };
+  }
+
+  // Handle different actions
+  if (parsed.action === 'content') {
+    return { content: entry.text };
+  }
+
+  if (parsed.action === 'chunk') {
+    const start = parsed.params?.start ?? 0;
+    const end = parsed.params?.end ?? entry.text.length;
+
+    // Clamp to actual content length
+    const clampedEnd = Math.min(end, entry.text.length);
+    const chunk = entry.text.slice(start, clampedEnd);
+
+    return { content: chunk };
+  }
+
+  if (parsed.action === 'structure') {
+    // For now, return a placeholder - full implementation in Issue #24
+    return {
+      content: null,
+      error: 'Structure extraction not yet implemented',
+      hint: 'Use content or chunk actions to access document text'
+    };
+  }
+
+  if (parsed.action === 'values') {
+    // Sheet values require specific range handling - placeholder for now
+    return {
+      content: null,
+      error: 'Sheet values extraction not yet implemented',
+      hint: 'Use sheets_batchGetValues tool to fetch specific ranges'
+    };
+  }
+
+  return { content: null, error: `Unknown action: ${parsed.action}` };
+}
 // Global auth client - will be initialized on first use
 let authClient: any = null;
 let authenticationPromise: Promise<any> | null = null;
@@ -1936,7 +2234,74 @@ server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   await ensureAuthenticated();
   log('Handling ReadResource request', { uri: request.params.uri });
-  const fileId = request.params.uri.replace("gdrive:///", "");
+
+  // Parse the URI to determine how to handle it
+  const parsed = parseResourceUri(request.params.uri);
+
+  // Handle new cache-based URI formats (Issue #23)
+  if (parsed.valid && parsed.type !== 'legacy') {
+    const cached = serveCachedContent(parsed);
+
+    if (cached.content !== null) {
+      log('Serving cached content', { uri: request.params.uri, contentLength: cached.content.length });
+      return {
+        contents: [
+          {
+            uri: request.params.uri,
+            mimeType: 'text/plain',
+            text: cached.content,
+          },
+        ],
+      };
+    }
+
+    // Cache miss or error - return helpful error message
+    const errorMessage = cached.error || 'Unknown error';
+    const hint = cached.hint || '';
+    log('Cache miss or error', { uri: request.params.uri, error: errorMessage });
+
+    return {
+      contents: [
+        {
+          uri: request.params.uri,
+          mimeType: 'text/plain',
+          text: JSON.stringify({
+            error: errorMessage,
+            hint: hint,
+            uri: request.params.uri,
+            suggestion: 'Use the appropriate fetch tool first to populate the cache, then access via this resource URI.'
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  // Invalid URI format
+  if (!parsed.valid) {
+    log('Invalid resource URI', { uri: request.params.uri, error: parsed.error });
+    return {
+      contents: [
+        {
+          uri: request.params.uri,
+          mimeType: 'text/plain',
+          text: JSON.stringify({
+            error: parsed.error,
+            supportedFormats: [
+              'gdrive:///{fileId} (legacy)',
+              'gdrive://docs/{docId}/content',
+              'gdrive://docs/{docId}/chunk/{start}-{end}',
+              'gdrive://docs/{docId}/structure',
+              'gdrive://sheets/{spreadsheetId}/values/{range}',
+              'gdrive://files/{fileId}/content/{start}-{end}'
+            ]
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  // Legacy format: gdrive:///{fileId} - use existing behavior
+  const fileId = parsed.resourceId!;
 
   const file = await drive.files.get({
     fileId,
