@@ -162,6 +162,50 @@ function cacheStats(): { size: number; entries: { key: string; type: string; age
 }
 
 // -----------------------------------------------------------------------------
+// TRUNCATION HELPER (Issue #25)
+// -----------------------------------------------------------------------------
+interface TruncationResult {
+  text: string;
+  truncated: boolean;
+  originalLength?: number;
+}
+
+/**
+ * Truncate content with actionable message for agents
+ *
+ * @param content - The content to potentially truncate
+ * @param options - Optional configuration
+ * @param options.limit - Character limit (defaults to CHARACTER_LIMIT)
+ * @param options.hint - Custom hint message for agents
+ * @returns Object with truncated text and truncation status
+ */
+function truncateResponse(
+  content: string,
+  options?: {
+    limit?: number;
+    hint?: string;
+  }
+): TruncationResult {
+  const limit = options?.limit ?? CHARACTER_LIMIT;
+
+  if (content.length <= limit) {
+    return { text: content, truncated: false };
+  }
+
+  const hint = options?.hint ??
+    "Use returnMode: 'summary' or narrower parameters to manage response size.";
+
+  return {
+    text: content.slice(0, limit) +
+      `\n\n--- TRUNCATED ---\n` +
+      `Response truncated from ${content.length.toLocaleString()} to ${limit.toLocaleString()} characters.\n` +
+      hint,
+    truncated: true,
+    originalLength: content.length
+  };
+}
+
+// -----------------------------------------------------------------------------
 // RESOURCE URI PARSER (Issue #23)
 // -----------------------------------------------------------------------------
 interface ParsedResourceUri {
