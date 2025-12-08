@@ -72,6 +72,348 @@ const TEXT_MIME_TYPES = {
   txt: 'text/plain',
   md: 'text/markdown'
 };
+
+// Cache Infrastructure Constants (Issue #23)
+const CHARACTER_LIMIT = 25000;  // Max characters before truncation
+const CACHE_TTL_MS = 30 * 60 * 1000;  // 30 minutes cache TTL
+
+// -----------------------------------------------------------------------------
+// DOCUMENT CACHE (Issue #23 - Resource Cache Infrastructure)
+// -----------------------------------------------------------------------------
+interface CacheEntry {
+  content: any;       // Original API response
+  text: string;       // Extracted text content
+  fetchedAt: number;  // Timestamp for TTL management
+  type: 'doc' | 'sheet' | 'file';  // Resource type
+}
+
+const documentCache = new Map<string, CacheEntry>();
+
+/**
+ * Store content in cache with current timestamp
+ */
+function cacheStore(key: string, content: any, text: string, type: CacheEntry['type']): void {
+  documentCache.set(key, {
+    content,
+    text,
+    fetchedAt: Date.now(),
+    type
+  });
+  log('Cache store', { key, textLength: text.length, type });
+}
+
+/**
+ * Retrieve content from cache if not expired
+ * Returns null if entry doesn't exist or is expired
+ */
+function cacheGet(key: string): CacheEntry | null {
+  const entry = documentCache.get(key);
+  if (!entry) {
+    return null;
+  }
+
+  // Check TTL expiration
+  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
+    documentCache.delete(key);
+    log('Cache expired', { key });
+    return null;
+  }
+
+  return entry;
+}
+
+/**
+ * Remove expired entries from cache (housekeeping)
+ */
+function cacheCleanup(): number {
+  const now = Date.now();
+  let removedCount = 0;
+
+  for (const [key, entry] of documentCache.entries()) {
+    if (now - entry.fetchedAt > CACHE_TTL_MS) {
+      documentCache.delete(key);
+      removedCount++;
+    }
+  }
+
+  if (removedCount > 0) {
+    log('Cache cleanup', { removedCount, remaining: documentCache.size });
+  }
+
+  return removedCount;
+}
+
+/**
+ * Get cache statistics
+ */
+function cacheStats(): { size: number; entries: { key: string; type: string; age: number; textLength: number }[] } {
+  const now = Date.now();
+  const entries = Array.from(documentCache.entries()).map(([key, entry]) => ({
+    key,
+    type: entry.type,
+    age: Math.round((now - entry.fetchedAt) / 1000), // age in seconds
+    textLength: entry.text.length
+  }));
+
+  return {
+    size: documentCache.size,
+    entries
+  };
+}
+
+// -----------------------------------------------------------------------------
+// TRUNCATION HELPER (Issue #25)
+// -----------------------------------------------------------------------------
+interface TruncationResult {
+  text: string;
+  truncated: boolean;
+  originalLength?: number;
+}
+
+/**
+ * Truncate content with actionable message for agents
+ *
+ * @param content - The content to potentially truncate
+ * @param options - Optional configuration
+ * @param options.limit - Character limit (defaults to CHARACTER_LIMIT)
+ * @param options.hint - Custom hint message for agents
+ * @returns Object with truncated text and truncation status
+ */
+function truncateResponse(
+  content: string,
+  options?: {
+    limit?: number;
+    hint?: string;
+  }
+): TruncationResult {
+  const limit = options?.limit ?? CHARACTER_LIMIT;
+
+  if (content.length <= limit) {
+    return { text: content, truncated: false };
+  }
+
+  const hint = options?.hint ??
+    "Use returnMode: 'summary' or narrower parameters to manage response size.";
+
+  return {
+    text: content.slice(0, limit) +
+      `\n\n--- TRUNCATED ---\n` +
+      `Response truncated from ${content.length.toLocaleString()} to ${limit.toLocaleString()} characters.\n` +
+      hint,
+    truncated: true,
+    originalLength: content.length
+  };
+}
+
+// -----------------------------------------------------------------------------
+// RESOURCE URI PARSER (Issue #23)
+// -----------------------------------------------------------------------------
+interface ParsedResourceUri {
+  valid: boolean;
+  type?: 'doc' | 'sheet' | 'file' | 'legacy';
+  resourceId?: string;
+  action?: 'content' | 'chunk' | 'structure' | 'values';
+  params?: {
+    start?: number;
+    end?: number;
+    range?: string;
+  };
+  error?: string;
+}
+
+/**
+ * Parse gdrive:// URIs into structured components
+ *
+ * Supported patterns:
+ * - gdrive:///{fileId}                         → legacy (original format)
+ * - gdrive://docs/{docId}/content              → full cached doc text
+ * - gdrive://docs/{docId}/chunk/{start}-{end}  → doc text slice
+ * - gdrive://docs/{docId}/structure            → doc headings/sections
+ * - gdrive://sheets/{id}/values/{range}        → sheet cell values
+ * - gdrive://files/{id}/content/{start}-{end}  → exported file content
+ */
+function parseResourceUri(uri: string): ParsedResourceUri {
+  // Legacy format: gdrive:///{fileId}
+  if (uri.startsWith('gdrive:///')) {
+    const fileId = uri.replace('gdrive:///', '');
+    if (!fileId) {
+      return { valid: false, error: 'Empty file ID in legacy URI' };
+    }
+    return { valid: true, type: 'legacy', resourceId: fileId };
+  }
+
+  // New format: gdrive://{type}/{id}/{action}[/{params}]
+  if (!uri.startsWith('gdrive://')) {
+    return { valid: false, error: 'Invalid URI scheme - must start with gdrive://' };
+  }
+
+  const path = uri.substring('gdrive://'.length);
+  const segments = path.split('/');
+
+  if (segments.length < 2) {
+    return { valid: false, error: 'URI must have at least type and resource ID' };
+  }
+
+  const resourceType = segments[0];
+  const resourceId = segments[1];
+  const action = segments[2];
+  const actionParams = segments[3];
+
+  if (!resourceId) {
+    return { valid: false, error: 'Missing resource ID' };
+  }
+
+  // Handle docs URIs
+  if (resourceType === 'docs') {
+    if (!action) {
+      return { valid: false, error: 'Docs URI requires action: content, chunk, or structure' };
+    }
+
+    if (action === 'content') {
+      return { valid: true, type: 'doc', resourceId, action: 'content' };
+    }
+
+    if (action === 'structure') {
+      return { valid: true, type: 'doc', resourceId, action: 'structure' };
+    }
+
+    if (action === 'chunk') {
+      if (!actionParams) {
+        return { valid: false, error: 'Chunk action requires range parameter (e.g., 0-5000)' };
+      }
+
+      const rangeMatch = actionParams.match(/^(\d+)-(\d+)$/);
+      if (!rangeMatch) {
+        return { valid: false, error: 'Invalid chunk range format. Use: {start}-{end} (e.g., 0-5000)' };
+      }
+
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+
+      if (start < 0) {
+        return { valid: false, error: 'Chunk start index cannot be negative' };
+      }
+
+      if (end <= start) {
+        return { valid: false, error: 'Chunk end index must be greater than start index' };
+      }
+
+      return { valid: true, type: 'doc', resourceId, action: 'chunk', params: { start, end } };
+    }
+
+    return { valid: false, error: `Unknown docs action: ${action}. Valid actions: content, chunk, structure` };
+  }
+
+  // Handle sheets URIs
+  if (resourceType === 'sheets') {
+    if (action !== 'values') {
+      return { valid: false, error: 'Sheets URI requires "values" action with range parameter' };
+    }
+
+    if (!actionParams) {
+      return { valid: false, error: 'Sheets values action requires range parameter (e.g., Sheet1!A1:B10)' };
+    }
+
+    // URL decode the range (it may be encoded)
+    const range = decodeURIComponent(actionParams);
+
+    return { valid: true, type: 'sheet', resourceId, action: 'values', params: { range } };
+  }
+
+  // Handle files URIs
+  if (resourceType === 'files') {
+    if (action !== 'content') {
+      return { valid: false, error: 'Files URI requires "content" action' };
+    }
+
+    if (!actionParams) {
+      // Full content without range
+      return { valid: true, type: 'file', resourceId, action: 'content' };
+    }
+
+    const rangeMatch = actionParams.match(/^(\d+)-(\d+)$/);
+    if (!rangeMatch) {
+      return { valid: false, error: 'Invalid content range format. Use: {start}-{end} (e.g., 0-5000)' };
+    }
+
+    const start = parseInt(rangeMatch[1], 10);
+    const end = parseInt(rangeMatch[2], 10);
+
+    if (start < 0) {
+      return { valid: false, error: 'Content start index cannot be negative' };
+    }
+
+    if (end <= start) {
+      return { valid: false, error: 'Content end index must be greater than start index' };
+    }
+
+    return { valid: true, type: 'file', resourceId, action: 'content', params: { start, end } };
+  }
+
+  return { valid: false, error: `Unknown resource type: ${resourceType}. Valid types: docs, sheets, files` };
+}
+
+/**
+ * Serve cached content based on parsed URI
+ * Returns null if cache miss, content string if hit
+ */
+function serveCachedContent(parsed: ParsedResourceUri): { content: string | null; error?: string; hint?: string } {
+  if (!parsed.valid || !parsed.resourceId) {
+    return { content: null, error: parsed.error };
+  }
+
+  // Legacy URIs don't use the cache
+  if (parsed.type === 'legacy') {
+    return { content: null, hint: 'Legacy URI format - use standard resource fetch' };
+  }
+
+  const cacheKey = parsed.resourceId;
+  const entry = cacheGet(cacheKey);
+
+  if (!entry) {
+    return {
+      content: null,
+      error: `Cache miss for resource: ${cacheKey}`,
+      hint: `First fetch the document using the appropriate tool (e.g., docs_getDocument) to populate the cache.`
+    };
+  }
+
+  // Handle different actions
+  if (parsed.action === 'content') {
+    return { content: entry.text };
+  }
+
+  if (parsed.action === 'chunk') {
+    const start = parsed.params?.start ?? 0;
+    const end = parsed.params?.end ?? entry.text.length;
+
+    // Clamp to actual content length
+    const clampedEnd = Math.min(end, entry.text.length);
+    const chunk = entry.text.slice(start, clampedEnd);
+
+    return { content: chunk };
+  }
+
+  if (parsed.action === 'structure') {
+    // For now, return a placeholder - full implementation in Issue #24
+    return {
+      content: null,
+      error: 'Structure extraction not yet implemented',
+      hint: 'Use content or chunk actions to access document text'
+    };
+  }
+
+  if (parsed.action === 'values') {
+    // Sheet values require specific range handling - placeholder for now
+    return {
+      content: null,
+      error: 'Sheet values extraction not yet implemented',
+      hint: 'Use sheets_batchGetValues tool to fetch specific ranges'
+    };
+  }
+
+  return { content: null, error: `Unknown action: ${parsed.action}` };
+}
 // Global auth client - will be initialized on first use
 let authClient: any = null;
 let authenticationPromise: Promise<any> | null = null;
@@ -241,7 +583,9 @@ const DriveCopyFileSchema = z.object({
 const DriveExportFileSchema = z.object({
   fileId: z.string().min(1, "File ID is required"),
   mimeType: z.string().min(1, "Export MIME type is required"),
-  supportsAllDrives: z.boolean().optional()
+  supportsAllDrives: z.boolean().optional(),
+  returnMode: z.enum(["summary", "full"]).default("summary")
+    .describe("'summary' (default): Returns metadata + resource URI, caches content. 'full': Returns complete response with truncation")
 });
 
 // Phase 3: Comments & Collaboration - 1:1 Mappings
@@ -481,7 +825,9 @@ const SheetsAddConditionalFormatRuleSchema = z.object({
 const SheetsGetSpreadsheetSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
   ranges: z.array(z.string()).optional(),
-  includeGridData: z.boolean().optional()
+  includeGridData: z.boolean().optional(),
+  returnMode: z.enum(["summary", "full"]).default("summary")
+    .describe("'summary' (default): Returns metadata + resource URI, caches content. 'full': Returns complete response with truncation")
 });
 
 const SheetsCreateSpreadsheetSchema = z.object({
@@ -508,7 +854,9 @@ const SheetsBatchGetValuesSchema = z.object({
   spreadsheetId: z.string().min(1, "Spreadsheet ID is required"),
   ranges: z.array(z.string()).min(1, "At least one range is required"),
   majorDimension: z.enum(["ROWS", "COLUMNS"]).optional(),
-  valueRenderOption: z.enum(["FORMATTED_VALUE", "UNFORMATTED_VALUE", "FORMULA"]).optional()
+  valueRenderOption: z.enum(["FORMATTED_VALUE", "UNFORMATTED_VALUE", "FORMULA"]).optional(),
+  returnMode: z.enum(["summary", "full"]).default("summary")
+    .describe("'summary' (default): Returns metadata + resource URI, caches content. 'full': Returns complete response with truncation")
 });
 
 const SheetsBatchUpdateValuesSchema = z.object({
@@ -1765,7 +2113,9 @@ const DocsDeletePositionedObjectSchema = z.object({
 
 const DocsGetSchema = z.object({
   documentId: z.string().min(1, "Document ID is required"),
-  includeTabsContent: z.boolean().optional()
+  includeTabsContent: z.boolean().optional(),
+  returnMode: z.enum(["summary", "full"]).default("summary")
+    .describe("'summary' (default): Returns metadata + resource URI, caches content. 'full': Returns complete response with truncation")
 });
 
 const DocsInsertSectionBreakSchema = z.object({
@@ -1936,7 +2286,74 @@ server.setRequestHandler(ListResourcesRequestSchema, async (request) => {
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   await ensureAuthenticated();
   log('Handling ReadResource request', { uri: request.params.uri });
-  const fileId = request.params.uri.replace("gdrive:///", "");
+
+  // Parse the URI to determine how to handle it
+  const parsed = parseResourceUri(request.params.uri);
+
+  // Handle new cache-based URI formats (Issue #23)
+  if (parsed.valid && parsed.type !== 'legacy') {
+    const cached = serveCachedContent(parsed);
+
+    if (cached.content !== null) {
+      log('Serving cached content', { uri: request.params.uri, contentLength: cached.content.length });
+      return {
+        contents: [
+          {
+            uri: request.params.uri,
+            mimeType: 'text/plain',
+            text: cached.content,
+          },
+        ],
+      };
+    }
+
+    // Cache miss or error - return helpful error message
+    const errorMessage = cached.error || 'Unknown error';
+    const hint = cached.hint || '';
+    log('Cache miss or error', { uri: request.params.uri, error: errorMessage });
+
+    return {
+      contents: [
+        {
+          uri: request.params.uri,
+          mimeType: 'text/plain',
+          text: JSON.stringify({
+            error: errorMessage,
+            hint: hint,
+            uri: request.params.uri,
+            suggestion: 'Use the appropriate fetch tool first to populate the cache, then access via this resource URI.'
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  // Invalid URI format
+  if (!parsed.valid) {
+    log('Invalid resource URI', { uri: request.params.uri, error: parsed.error });
+    return {
+      contents: [
+        {
+          uri: request.params.uri,
+          mimeType: 'text/plain',
+          text: JSON.stringify({
+            error: parsed.error,
+            supportedFormats: [
+              'gdrive:///{fileId} (legacy)',
+              'gdrive://docs/{docId}/content',
+              'gdrive://docs/{docId}/chunk/{start}-{end}',
+              'gdrive://docs/{docId}/structure',
+              'gdrive://sheets/{spreadsheetId}/values/{range}',
+              'gdrive://files/{fileId}/content/{start}-{end}'
+            ]
+          }, null, 2),
+        },
+      ],
+    };
+  }
+
+  // Legacy format: gdrive:///{fileId} - use existing behavior
+  const fileId = parsed.resourceId!;
 
   const file = await drive.files.get({
     fileId,
@@ -5076,17 +5493,63 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           responseType: 'arraybuffer'
         });
 
-        // Return base64 encoded data for binary formats
-        const base64Data = Buffer.from(result.data as ArrayBuffer).toString('base64');
+        const buffer = Buffer.from(result.data as ArrayBuffer);
+        const isTextFormat = args.mimeType.startsWith('text/') || args.mimeType === 'application/json';
+        const contentText = isTextFormat ? buffer.toString('utf-8') : '';
+
+        // Handle returnMode (Issue #26)
+        if (args.returnMode === 'summary') {
+          // Get file metadata for summary
+          const fileInfo = await drive.files.get({
+            fileId: args.fileId,
+            fields: 'name,mimeType',
+            supportsAllDrives: true
+          });
+
+          // Cache the content for later Resource access
+          if (isTextFormat) {
+            cacheStore(args.fileId, { mimeType: args.mimeType }, contentText, 'file');
+          }
+
+          const summary = {
+            fileName: fileInfo.data.name || 'unknown',
+            fileId: args.fileId,
+            exportMimeType: args.mimeType,
+            characterCount: isTextFormat ? contentText.length : buffer.length,
+            isTextFormat,
+            resourceUri: isTextFormat
+              ? `gdrive://files/${args.fileId}/content/{start}-{end}`
+              : null,
+            hint: isTextFormat
+              ? `Use resources/read with content URI to access data. Example: gdrive://files/${args.fileId}/content/0-5000`
+              : 'Binary format - use returnMode: "full" to get base64-encoded content'
+          };
+
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(summary, null, 2)
+            }],
+            isError: false
+          };
+        }
+
+        // returnMode: 'full' - return complete response with truncation
+        const base64Data = buffer.toString('base64');
+        const fullResponse = JSON.stringify({
+          mimeType: args.mimeType,
+          data: base64Data,
+          encoding: 'base64'
+        }, null, 2);
+
+        const truncated = truncateResponse(fullResponse, {
+          hint: `Use returnMode: 'summary' to get metadata and cache content for chunk access via gdrive://files/${args.fileId}/content/{start}-{end}`
+        });
 
         return {
           content: [{
             type: "text",
-            text: JSON.stringify({
-              mimeType: args.mimeType,
-              data: base64Data,
-              encoding: 'base64'
-            }, null, 2)
+            text: truncated.text
           }],
           isError: false
         };
@@ -6017,8 +6480,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             includeGridData: args.includeGridData
           });
 
+          const fullJson = JSON.stringify(response.data, null, 2);
+
+          // Handle returnMode (Issue #26)
+          if (args.returnMode === 'summary') {
+            // Cache the content for later Resource access
+            cacheStore(args.spreadsheetId, response.data, fullJson, 'sheet');
+
+            // Extract sheet names
+            const sheetNames = (response.data.sheets || []).map(
+              (sheet: any) => sheet.properties?.title || 'Untitled'
+            );
+
+            const summary = {
+              title: response.data.properties?.title || 'Untitled',
+              spreadsheetId: args.spreadsheetId,
+              sheetCount: sheetNames.length,
+              sheetNames,
+              locale: response.data.properties?.locale,
+              timeZone: response.data.properties?.timeZone,
+              resourceUri: `gdrive://sheets/${args.spreadsheetId}/values/{range}`,
+              hint: `Use sheets_batchGetValues to fetch specific ranges, or resources/read with values URI. Example: gdrive://sheets/${args.spreadsheetId}/values/Sheet1!A1:B10`
+            };
+
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(summary, null, 2)
+              }],
+              isError: false
+            };
+          }
+
+          // returnMode: 'full' - return complete response with truncation
+          const truncated = truncateResponse(fullJson, {
+            hint: `Use returnMode: 'summary' to get metadata, or sheets_batchGetValues for specific ranges`
+          });
+
           return {
-            content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
+            content: [{ type: "text", text: truncated.text }],
             isError: false
           };
         } catch (error: any) {
@@ -6130,8 +6630,54 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             valueRenderOption: args.valueRenderOption
           });
 
+          const fullJson = JSON.stringify(response.data, null, 2);
+
+          // Handle returnMode (Issue #26)
+          if (args.returnMode === 'summary') {
+            // Cache the content for later Resource access
+            const cacheKey = `${args.spreadsheetId}:values:${args.ranges.join(',')}`;
+            cacheStore(cacheKey, response.data, fullJson, 'sheet');
+
+            // Calculate stats
+            let totalCells = 0;
+            const rangeStats = (response.data.valueRanges || []).map((vr: any) => {
+              const rows = vr.values?.length || 0;
+              const cols = rows > 0 ? (vr.values[0]?.length || 0) : 0;
+              const cells = rows * cols;
+              totalCells += cells;
+              return {
+                range: vr.range,
+                rows,
+                columns: cols,
+                cells
+              };
+            });
+
+            const summary = {
+              spreadsheetId: args.spreadsheetId,
+              rangeCount: rangeStats.length,
+              totalCells,
+              ranges: rangeStats,
+              resourceUri: `gdrive://sheets/${args.spreadsheetId}/values/{range}`,
+              hint: `Data cached. Use narrower ranges for specific data, or resources/read with values URI.`
+            };
+
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(summary, null, 2)
+              }],
+              isError: false
+            };
+          }
+
+          // returnMode: 'full' - return complete response with truncation
+          const truncated = truncateResponse(fullJson, {
+            hint: `Use returnMode: 'summary' to get metadata, or request narrower ranges`
+          });
+
           return {
-            content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }],
+            content: [{ type: "text", text: truncated.text }],
             isError: false
           };
         } catch (error: any) {
@@ -8442,10 +8988,71 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             ...(args.includeTabsContent !== undefined && { includeTabsContent: args.includeTabsContent })
           });
 
+          // Extract text content from document body
+          const extractText = (content: any[]): string => {
+            let text = '';
+            for (const element of content || []) {
+              if (element.paragraph?.elements) {
+                for (const el of element.paragraph.elements) {
+                  if (el.textRun?.content) {
+                    text += el.textRun.content;
+                  }
+                }
+              } else if (element.table) {
+                // Extract text from table cells
+                for (const row of element.table.tableRows || []) {
+                  for (const cell of row.tableCells || []) {
+                    text += extractText(cell.content);
+                  }
+                }
+              }
+            }
+            return text;
+          };
+
+          const docText = extractText(document.data.body?.content || []);
+          const fullJson = JSON.stringify(document.data, null, 2);
+
+          // Handle returnMode (Issue #26)
+          if (args.returnMode === 'summary') {
+            // Cache the content for later Resource access
+            cacheStore(args.documentId, document.data, docText, 'doc');
+
+            // Count sections (headings)
+            let sectionCount = 0;
+            for (const element of document.data.body?.content || []) {
+              if (element.paragraph?.paragraphStyle?.namedStyleType?.startsWith('HEADING')) {
+                sectionCount++;
+              }
+            }
+
+            const summary = {
+              title: document.data.title || 'Untitled',
+              documentId: args.documentId,
+              characterCount: docText.length,
+              sectionCount,
+              resourceUri: `gdrive://docs/${args.documentId}/chunk/{start}-{end}`,
+              hint: 'Use resources/read with chunk URI to access content. Example: gdrive://docs/' + args.documentId + '/chunk/0-5000'
+            };
+
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(summary, null, 2)
+              }],
+              isError: false
+            };
+          }
+
+          // returnMode: 'full' - return complete response with truncation
+          const truncated = truncateResponse(fullJson, {
+            hint: `Use returnMode: 'summary' to get metadata and cache content for chunk access via gdrive://docs/${args.documentId}/chunk/{start}-{end}`
+          });
+
           return {
             content: [{
               type: "text",
-              text: JSON.stringify(document.data, null, 2)
+              text: truncated.text
             }],
             isError: false
           };
